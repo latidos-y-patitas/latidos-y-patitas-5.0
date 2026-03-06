@@ -32,6 +32,22 @@ class SolicitudAdopcionController extends Controller
         return response()->json($solicitud);
     }
 
+    public function aprobar($id)
+    {
+        $solicitud = SolicitudAdopcion::findOrFail($id);
+        $solicitud->estado = 'aprobada';
+        $solicitud->save();
+        return response()->json($solicitud);
+    }
+
+    public function rechazar($id)
+    {
+        $solicitud = SolicitudAdopcion::findOrFail($id);
+        $solicitud->estado = 'rechazada';
+        $solicitud->save();
+        return response()->json($solicitud);
+    }
+
     public function destroy($id)
     {
         SolicitudAdopcion::destroy($id);
