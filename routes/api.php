@@ -14,6 +14,7 @@ use App\Http\Controllers\RegistroClinicoController;
 use App\Http\Controllers\SolicitudAdopcionController;
 use App\Http\Controllers\MetodoPagoController;
 use App\Http\Controllers\PagoController;
+use App\Http\Controllers\AuthController;
 
 // Seguridad desactivada: todas las rutas abiertas mientras terminas el frontend
 Route::apiResource('roles', RolController::class);
@@ -25,6 +26,7 @@ Route::post('logout', [AuthController::class, 'logout']);
 
 // Recursos abiertos
 Route::apiResource('mascotas', MascotaController::class);
+Route::get('mascotas/especies', [MascotaController::class, 'especies']);
 Route::apiResource('disponibilidad-citas', DisponibilidadCitaController::class);
 Route::post('citas/{id}/confirmar', [CitaController::class, 'confirmar']);
 Route::post('citas/{id}/cancelar', [CitaController::class, 'cancelar']);
@@ -39,3 +41,7 @@ Route::post('solicitudes-adopcion/{id}/aprobar', [SolicitudAdopcionController::c
 Route::post('solicitudes-adopcion/{id}/rechazar', [SolicitudAdopcionController::class, 'rechazar']);
 Route::apiResource('metodos-pago', MetodoPagoController::class);
 Route::apiResource('pagos', PagoController::class);
+<<<<<<< HEAD
+=======
+Route::post('login', [AuthController::class, 'login']);
+>>>>>>> f026b2ccceacc8aef92ea99633e715f274f2e784
