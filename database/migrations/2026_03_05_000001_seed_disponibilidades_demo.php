@@ -8,8 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Tomar un veterinario existente; si no hay, usar 1
-        $vetId = DB::table('veterinarios')->value('id_veterinario') ?? 1;
+        // look for an existing veterinarian; only seed if one is present
+        $vetId = DB::table('veterinarios')->value('id_veterinario');
+        if (!$vetId) {
+            // nothing to do when no vets exist; avoids foreign key failures during
+            // fresh sqlite tests or empty databases
+            return;
+        }
 
         // Fechas base: hoy y los próximos 3 días
         $d0 = Carbon::today();

@@ -47,12 +47,29 @@ class CitaController extends Controller
 
     public function store(Request $request)
     {
+        // id_cliente puede omitirse, lo rellenamos automáticamente.
         $data = $request->validate([
-            'id_cliente' => ['required', 'integer', 'exists:usuarios,id_usuario'],
+            'id_cliente' => ['nullable','integer','exists:usuarios,id_usuario'],
             'id_disponibilidad' => ['required', 'integer', 'exists:disponibilidad_citas,id_disponibilidad'],
             'motivo' => ['nullable', 'string', 'max:255'],
             'estado' => ['nullable', 'in:pendiente,confirmada,cancelada'],
         ]);
+        if (empty($data['id_cliente'])) {
+            // si hay usuario autenticado lo usamos (si se implementa auth)
+            $user = $request->attributes->get('user');
+            if ($user && $user->rol && $user->rol->nombre_rol === 'cliente') {
+                $data['id_cliente'] = $user->id_usuario;
+            } else {
+                $clienteId = DB::table('usuarios')
+                    ->whereIn('id_rol', function ($q) {
+                        $q->select('id_rol')->from('roles')->where('nombre_rol', 'cliente');
+                    })
+                    ->value('id_usuario');
+                if ($clienteId) {
+                    $data['id_cliente'] = $clienteId;
+                }
+            }
+        }
         $data['estado'] = $data['estado'] ?? 'pendiente';
         $cita = Cita::create($data);
         DisponibilidadCita::where('id_disponibilidad', $data['id_disponibilidad'])->update(['estado' => 'reservada']);
@@ -62,6 +79,104 @@ class CitaController extends Controller
     public function show($id)
     {
         $cita = Cita::with('cliente', 'disponibilidad.veterinario', 'pago')->findOrFail($id);
+        return response()->json($cita);
+    }
+
+    /**
+     * Obtiene las citas asociadas a un veterinario, opcionalmente filtradas por estado.
+     */
+    public function porVeterinario($vetId)
+    {
+        $estado = request()->query('estado');
+        $q = Cita::with('cliente', 'disponibilidad.veterinario')
+            ->whereHas('disponibilidad', fn ($q) => $q->where('id_veterinario', $vetId));
+        if (!empty($estado)) {
+            $q->where('estado', $estado);
+        }
+        $citas = $q->get();
+        return response()->json($citas);
+    }
+
+    /**
+     * Reservar mediante veterinario, fecha y hora (conveniencia cliente).
+     */
+    public function solicitar(Request $request)
+    {
+        $data = $request->validate([
+            'id_cliente' => ['nullable','integer','exists:usuarios,id_usuario'],
+            'id_veterinario' => ['required','integer','exists:veterinarios,id_veterinario'],
+            'fecha' => ['required','date'],
+            'hora' => ['required','date_format:H:i'],
+            'motivo' => ['nullable','string','max:255'],
+        ]);
+        $disp = DisponibilidadCita::where('id_veterinario', $data['id_veterinario'])
+            ->where('fecha', $data['fecha'])
+            ->where('hora_inicio', '<=', $data['hora'])
+            ->where('hora_fin', '>', $data['hora'])
+            ->where('estado', 'disponible')
+            ->first();
+        if (!$disp) {
+            return response()->json(['message' => 'No hay disponibilidad en ese horario'], 422);
+        }
+        $data['id_disponibilidad'] = $disp->id_disponibilidad;
+        // mismo llenado de cliente que en store
+        if (empty($data['id_cliente'])) {
+            $user = $request->attributes->get('user');
+            if ($user && $user->rol && $user->rol->nombre_rol === 'cliente') {
+                $data['id_cliente'] = $user->id_usuario;
+            } else {
+                $clienteId = DB::table('usuarios')
+                    ->whereIn('id_rol', function ($q) {
+                        $q->select('id_rol')->from('roles')->where('nombre_rol', 'cliente');
+                    })
+                    ->value('id_usuario');
+                if ($clienteId) {
+                    $data['id_cliente'] = $clienteId;
+                }
+            }
+        }
+        $data['estado'] = 'pendiente';
+        $cita = Cita::create($data);
+        $disp->estado = 'reservada';
+        $disp->save();
+        return response()->json($cita, 201);
+    }
+
+    /**
+     * Sólo las citas pendientes para un veterinario.
+     */
+    public function pendientesPorVeterinario($vetId)
+    {
+        $citas = Cita::with('cliente', 'disponibilidad.veterinario')
+            ->where('estado', 'pendiente')
+            ->whereHas('disponibilidad', fn ($q) => $q->where('id_veterinario', $vetId))
+            ->get();
+        return response()->json($citas);
+    }
+
+    // utilidad común para autorizar a un veterinario
+    protected function authorizeVet($vetId, Cita $cita)
+    {
+        if ($cita->disponibilidad && $cita->disponibilidad->id_veterinario != $vetId) {
+            abort(403, 'No autorizado para esta cita');
+        }
+    }
+
+    public function confirmarPorVeterinario($vetId, $id)
+    {
+        $cita = Cita::with('disponibilidad')->findOrFail($id);
+        $this->authorizeVet($vetId, $cita);
+        $cita->estado = 'confirmada';
+        $cita->save();
+        return response()->json($cita);
+    }
+
+    public function cancelarPorVeterinario($vetId, $id)
+    {
+        $cita = Cita::with('disponibilidad')->findOrFail($id);
+        $this->authorizeVet($vetId, $cita);
+        $cita->estado = 'cancelada';
+        $cita->save();
         return response()->json($cita);
     }
 

@@ -9,7 +9,19 @@ class SolicitudAdopcionController extends Controller
 {
     public function index()
     {
+        // listado general (para administración o API pública)
         $solicitudes = SolicitudAdopcion::with('cliente', 'mascota')->get();
+        return response()->json($solicitudes);
+    }
+
+    /**
+     * Devuelve sólo solicitudes pendientes (útil para el panel de admin).
+     */
+    public function pendientes()
+    {
+        $solicitudes = SolicitudAdopcion::with('cliente', 'mascota')
+            ->where('estado', 'pendiente')
+            ->get();
         return response()->json($solicitudes);
     }
 
@@ -86,6 +98,12 @@ class SolicitudAdopcionController extends Controller
         $solicitud = SolicitudAdopcion::findOrFail($id);
         $solicitud->estado = 'aprobada';
         $solicitud->save();
+        // cuando se aprueba la solicitud, marcamos la mascota como adoptada
+        $mascota = $solicitud->mascota;
+        if ($mascota) {
+            $mascota->estado = 'adoptada';
+            $mascota->save();
+        }
         return response()->json($solicitud);
     }
 
@@ -94,6 +112,7 @@ class SolicitudAdopcionController extends Controller
         $solicitud = SolicitudAdopcion::findOrFail($id);
         $solicitud->estado = 'rechazada';
         $solicitud->save();
+        // en caso de rechazo no tocamos la mascota, permanece disponible
         return response()->json($solicitud);
     }
 

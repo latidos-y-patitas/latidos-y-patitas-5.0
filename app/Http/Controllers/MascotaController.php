@@ -24,9 +24,23 @@ class MascotaController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->only([
-            'nombre','especie','raza','edad','sexo','descripcion','estado','fecha_publicacion','id_admin','imagen'
+        // basic validation so we fail earlier instead of throwing a 500 when the
+        // database rejects a missing foreign key. during initial development we
+        // don't have authentication enabled, so default to the first admin user.
+        $request->validate([
+            'id_admin' => 'nullable|exists:usuarios,id_usuario',
         ]);
+
+        // extract fields except imagen; file upload handled separately
+        $data = $request->only([
+            'nombre','especie','raza','edad','sexo','descripcion','estado','fecha_publicacion','id_admin'
+        ]);
+
+        // if the client didn't supply an admin id, fall back to a sensible value
+        if (empty($data['id_admin'])) {
+            $data['id_admin'] = DB::table('usuarios')->where('id_rol', DB::table('roles')->where('nombre_rol', 'admin')->value('id_rol'))->value('id_usuario') ?? 1;
+        }
+
         if (!$request->filled('fecha_publicacion')) {
             $data['fecha_publicacion'] = now()->toDateString();
         }
@@ -50,9 +64,15 @@ class MascotaController extends Controller
     public function update(Request $request, $id)
     {
         $mascota = Mascota::findOrFail($id);
-        $data = $request->only([
-            'nombre','especie','raza','edad','sexo','descripcion','estado','fecha_publicacion','id_admin','imagen'
+
+        $request->validate([
+            'id_admin' => 'nullable|exists:usuarios,id_usuario',
         ]);
+
+        $data = $request->only([
+            'nombre','especie','raza','edad','sexo','descripcion','estado','fecha_publicacion','id_admin'
+        ]);
+
         if ($request->hasFile('imagen')) {
             $path = $request->file('imagen')->store('mascotas', 'public');
             $data['imagen'] = rtrim(env('APP_URL', 'http://localhost'), '/').'/storage/'.$path;

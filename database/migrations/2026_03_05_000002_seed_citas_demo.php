@@ -10,6 +10,11 @@ return new class extends Migration
     public function up(): void
     {
         $rolCliente = DB::table('roles')->where('nombre_rol', 'cliente')->value('id_rol');
+        // if roles haven't been seeded yet, bail out; tests will add their own data
+        if (!$rolCliente) {
+            return;
+        }
+
         $clienteId = DB::table('usuarios')->where('email', 'cliente.demo@example.com')->value('id_usuario');
         if (!$clienteId) {
             $clienteId = DB::table('usuarios')->insertGetId([
@@ -17,7 +22,7 @@ return new class extends Migration
                 'email' => 'cliente.demo@example.com',
                 'password' => Hash::make('cliente1234'),
                 'telefono' => '0000000002',
-                'id_rol' => $rolCliente ?: DB::table('roles')->value('id_rol'),
+                'id_rol' => $rolCliente,
                 'created_at' => now(),
             ]);
         }
