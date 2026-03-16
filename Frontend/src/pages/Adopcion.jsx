@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import Header from '../Components/Header.jsx'
-import Hero from '../Components/Hero.jsx'
-import Button from '../Components/Button.jsx'
-import { listarMascotas } from '../lib/api/adopcion'
+import { useEffect, useState } from 'react';
+import Header from '../Components/Header.jsx';
+import Hero from '../Components/Hero.jsx';
+import Button from '../Components/Button.jsx';
+import { listarMascotas } from '../lib/api/adopcion';
+import '../styles/adopcion.css'; 
 
 const mascotas = [
   {
@@ -29,124 +30,130 @@ const mascotas = [
     descripcion: 'Copito es un conejo muy dócil y limpio. Es ideal para familias con niños.',
     foto: 'https://images.unsplash.com/photo-1540322530211-4775c61ab9b0?q=80&w=800&auto=format&fit=crop'
   }
-]
+];
 
 export default function Adopcion() {
-  const [items, setItems] = useState(mascotas)
+  const [items, setItems] = useState(mascotas);
+
   function resolveImage(src) {
-    const fallback = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop'
-    if (!src || typeof src !== 'string') return fallback
-    // absolute urls pass-through
-    if (/^https?:\/\//i.test(src)) return src
-    // normalize common storage prefixes
-    let path = src.replace(/^public\//, '')
-    if (!path.startsWith('/')) path = '/' + path
-    // prefer backend target host if provided
-    const target = import.meta.env.VITE_API_TARGET || ''
+    const fallback = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
+    if (!src || typeof src !== 'string') return fallback;
+    if (/^https?:\/\//i.test(src)) return src;
+    let path = src.replace(/^public\//, '');
+    if (!path.startsWith('/')) path = '/' + path;
+    const target = import.meta.env.VITE_API_TARGET || '';
     if (target) {
-      const base = String(target).replace(/\/+$/, '')
-      return `${base}${path}`
+      const base = String(target).replace(/\/+$/, '');
+      return `${base}${path}`;
     }
-    // as a last resort, let the dev server try to proxy static files
-    return path
+    return path;
   }
+
   async function refresh() {
     try {
-      const data = await listarMascotas()
+      const data = await listarMascotas();
       if (Array.isArray(data) && data.length > 0) {
         const available = data.filter((m) => {
-          const estado = String(m?.estado ?? '').toLowerCase()
-          // visible si no tiene estado, o si está disponible/activo
-          if (!estado) return true
-          return estado.includes('disponible') || estado.includes('activo')
-        })
+          const estado = String(m?.estado ?? '').toLowerCase();
+          if (!estado) return true;
+          return estado.includes('disponible') || estado.includes('activo');
+        });
         const mapped = (available.length > 0 ? available : data).map((m) => {
-          const nombre = m?.nombre ?? 'Mascota'
-          const especie = m?.especie ?? m?.especieRef?.nombre ?? 'Desconocida'
-          const raza = m?.raza ?? ''
-          const edadRaw = m?.edad
+          const nombre = m?.nombre ?? 'Mascota';
+          const especie = m?.especie ?? m?.especieRef?.nombre ?? 'Desconocida';
+          const raza = m?.raza ?? '';
+          const edadRaw = m?.edad;
           const edad = (typeof edadRaw === 'number' && Number.isFinite(edadRaw))
             ? String(edadRaw)
-            : (edadRaw ?? '')
-          const descripcion = m?.descripcion ?? ''
-          const foto = resolveImage(m?.imagen ?? m?.foto)
-          return { nombre, especie, raza, edad, descripcion, foto }
-        })
-        setItems(mapped)
+            : (edadRaw ?? '');
+          const descripcion = m?.descripcion ?? '';
+          const foto = resolveImage(m?.imagen ?? m?.foto);
+          return { nombre, especie, raza, edad, descripcion, foto };
+        });
+        setItems(mapped);
       }
     } catch {}
   }
+
   useEffect(() => {
-    refresh()
-    function onUpdate() { refresh() }
-    window.addEventListener('mascotas:updated', onUpdate)
-    return () => window.removeEventListener('mascotas:updated', onUpdate)
-  }, [])
+    refresh();
+    function onUpdate() { refresh(); }
+    window.addEventListener('mascotas:updated', onUpdate);
+    return () => window.removeEventListener('mascotas:updated', onUpdate);
+  }, []);
+
   return (
-    <div>
+    <div className="adopcion-page">
       <Header />
+
       <Hero full>
-        <div style={{
-          width: '100%',
-          maxWidth: 720,
-          background: 'rgba(255,255,255,0.9)',
-          color: '#111827',
-          borderRadius: 16,
-          padding: 24,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800 }}>Adopción</h2>
-          <p style={{ marginTop: 8 }}>Encuentra a tu compañero perfecto</p>
+        <div className="hero-contenido">
+          <div className="hero-card">
+            <span className="hero-badge">🐾 Adopción responsable</span>
+            <h1 className="hero-titulo">
+              Encuentra a tu <span>compañero ideal</span>
+            </h1>
+            <p className="hero-descripcion">
+              Todos nuestros animales están vacunados, desparasitados y listos para llenar tu hogar de amor.
+            </p>
+          </div>
         </div>
       </Hero>
-      <section style={{ padding: '24px 16px', minHeight: '100vh' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 16,
-          maxWidth: 1100,
-          margin: '0 auto'
-        }}>
-          {items.map((m) => (
-            <article key={m.nombre} style={{
-              background: '#f5f5f5',
-              borderRadius: 16,
-              padding: 16,
-              boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-            }}>
-              <h3 style={{ margin: '4px 0 10px', fontSize: 20, color: '#111827' }}>{m.nombre}</h3>
-              <div style={{
-                width: '100%',
-                aspectRatio: '16/10',
-                borderRadius: 12,
-                overflow: 'hidden',
-                marginBottom: 12
-              }}>
-                <img src={m.foto} alt={m.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop' }} />
-              </div>
-              <p style={{ margin: '6px 0', color: '#111827' }}><strong style={{ color: '#111827' }}>Especie:</strong> {m.especie || '—'}</p>
-              <p style={{ margin: '6px 0', color: '#111827' }}><strong style={{ color: '#111827' }}>Raza:</strong> {m.raza || '—'}</p>
-              <p style={{ margin: '6px 0', color: '#111827' }}><strong style={{ color: '#111827' }}>Edad:</strong> {m.edad || '—'}</p>
-              <p style={{ marginTop: 8, color: '#111827' }}>{m.descripcion || ''}</p>
-              <div style={{ marginTop: 12 }}>
-                <Button onClick={() => {
-                  try {
-                    localStorage.setItem('selected_mascota_nombre', m.nombre)
-                    localStorage.setItem('selected_mascota_especie', m.especie)
-                  } catch (e) { void e }
-                  {
-                    const q = new URLSearchParams()
-                    q.set('mascota', m.nombre || '')
-                    if (m.especie) q.set('especie', m.especie)
-                    window.location.hash = 'solicitud-adopcion?' + q.toString()
-                  }
-                }}>Adoptar</Button>
-              </div>
-            </article>
-          ))}
+
+      <section className="mascotas-section">
+        <div className="mascotas-container">
+          <div className="seccion-header">
+            <span className="seccion-badge">ADOPCIÓN</span>
+            <h2>Mascotas que esperan por ti</h2>
+            <p>Conoce a cada uno de ellos y dales una segunda oportunidad</p>
+          </div>
+
+          <div className="mascotas-grid">
+            {items.map((m, index) => (
+              <article key={m.nombre} className="mascota-card" style={{ animationDelay: `${index * 0.1}s` }}>
+                <div className="mascota-imagen">
+                  <img
+                    src={m.foto}
+                    alt={m.nombre}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
+                    }}
+                  />
+                  <span className={`especie-badge especie-${m.especie?.toLowerCase() || 'otro'}`}>
+                    {m.especie || 'Mascota'}
+                  </span>
+                </div>
+
+                <div className="mascota-info">
+                  <h3>{m.nombre}</h3>
+                  <div className="mascota-detalles">
+                    <p><strong>Raza:</strong> {m.raza || '—'}</p>
+                    <p><strong>Edad:</strong> {m.edad || '—'}</p>
+                  </div>
+                  <p className="mascota-descripcion">{m.descripcion || 'Sin descripción disponible'}</p>
+
+                  <div className="mascota-accion">
+                    <Button
+                      onClick={() => {
+                        try {
+                          localStorage.setItem('selected_mascota_nombre', m.nombre);
+                          localStorage.setItem('selected_mascota_especie', m.especie);
+                        } catch (e) {}
+                        const q = new URLSearchParams();
+                        q.set('mascota', m.nombre || '');
+                        if (m.especie) q.set('especie', m.especie);
+                        window.location.hash = 'solicitud-adopcion?' + q.toString();
+                      }}
+                    >
+                      Adoptar
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
     </div>
-  )
+  );
 }
