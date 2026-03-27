@@ -1,358 +1,468 @@
-import { useEffect, useState } from 'react'
-import Header from '../Components/Header.jsx'
-import Hero from '../Components/Hero.jsx'
-import TextInput from '../Components/TextInput.jsx'
-import Button from '../Components/Button.jsx'
-import { listarMascotas, crearMascota, actualizarMascota, eliminarMascota } from '../lib/api/adopcion'
+import { useEffect, useState } from 'react';
+import Header from '../Components/Header.jsx';
+import Hero from '../Components/Hero.jsx';
+import TextInput from '../Components/TextInput.jsx';
+import Button from '../Components/Button.jsx';
+import { listarMascotas, crearMascota, actualizarMascota, eliminarMascota } from '../lib/api/adopcion';
 
 export default function AdminMascotas() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  // Formulario creación
+  const [nombre, setNombre] = useState('');
+  const [idEspecie, setIdEspecie] = useState('');
+  const [idSexo, setIdSexo] = useState('');
+  const [raza, setRaza] = useState('');
+  const [edad, setEdad] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [imagenFile, setImagenFile] = useState(null);
 
-  const [nombre, setNombre] = useState('')
-  const [idEspecie, setIdEspecie] = useState('')
-  const [idSexo, setIdSexo] = useState('')
-  const [raza, setRaza] = useState('')
-  const [edad, setEdad] = useState('')
-  const [descripcion, setDescripcion] = useState('')
-  const [imagenFile, setImagenFile] = useState(null)
+  // Datos para selects
+  const [especies, setEspecies] = useState([]);
+  const [sexos, setSexos] = useState([]);
 
-  const [especies, setEspecies] = useState([])
-  const [sexos, setSexos] = useState([])
+  // Edición
+  const [editId, setEditId] = useState(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editIdEspecie, setEditIdEspecie] = useState('');
+  const [editIdSexo, setEditIdSexo] = useState('');
+  const [editRaza, setEditRaza] = useState('');
+  const [editEdad, setEditEdad] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
+  const [editImagenFile, setEditImagenFile] = useState(null);
 
-  const [editId, setEditId] = useState(null)
-  const [editNombre, setEditNombre] = useState('')
-  const [editIdEspecie, setEditIdEspecie] = useState('')
-  const [editIdSexo, setEditIdSexo] = useState('')
-  const [editRaza, setEditRaza] = useState('')
-  const [editEdad, setEditEdad] = useState('')
-  const [editDescripcion, setEditDescripcion] = useState('')
-  const [editImagenFile, setEditImagenFile] = useState(null)
-
+  // Cargar mascotas
   async function load() {
-    setError('')
+    setError('');
     try {
-      const data = await listarMascotas()
-      setItems(Array.isArray(data) ? data : [])
+      const data = await listarMascotas();
+      setItems(Array.isArray(data) ? data : []);
     } catch {
-      setError('No se pudieron cargar mascotas')
+      setError('No se pudieron cargar mascotas');
     }
   }
 
+  // Cargar opciones de especies y sexos
   async function loadOpciones() {
     try {
-
-      const resEspecies = await fetch("http://localhost:8000/api/especies")
-      const especiesData = await resEspecies.json()
-
-      const resSexos = await fetch("http://localhost:8000/api/sexos")
-      const sexosData = await resSexos.json()
-
-      setEspecies(especiesData)
-      setSexos(sexosData)
-
+      const base = import.meta.env.VITE_API_TARGET || 'http://localhost:8000';
+      const resEspecies = await fetch(`${base}/api/especies`);
+      const especiesData = await resEspecies.json();
+      const resSexos = await fetch(`${base}/api/sexos`);
+      const sexosData = await resSexos.json();
+      setEspecies(especiesData);
+      setSexos(sexosData);
     } catch (err) {
-      console.error("Error cargando selects", err)
+      console.error('Error cargando selects', err);
     }
   }
 
   useEffect(() => {
-    load()
-    loadOpciones()
-  }, [])
+    load();
+    loadOpciones();
+  }, []);
 
+  // Crear mascota
   async function onCreate(e) {
-
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
     try {
-
-      const edadNum = edad !== '' ? Number(edad) : undefined
-
+      const edadNum = edad !== '' ? Number(edad) : undefined;
       const payload = {
         nombre,
         id_especie: idEspecie,
         id_sexo: idSexo,
         raza,
         edad: edadNum,
-        descripcion
-      }
+        descripcion,
+      };
+      if (imagenFile) payload.imagen = imagenFile;
 
-      if (imagenFile) payload.imagen = imagenFile
-
-      await crearMascota(payload)
-
-      setNombre('')
-      setIdEspecie('')
-      setIdSexo('')
-      setRaza('')
-      setEdad('')
-      setDescripcion('')
-      setImagenFile(null)
-
-      await load()
-
+      await crearMascota(payload);
+      setSuccess('Mascota agregada correctamente');
+      setNombre('');
+      setIdEspecie('');
+      setIdSexo('');
+      setRaza('');
+      setEdad('');
+      setDescripcion('');
+      setImagenFile(null);
+      await load();
     } catch {
-      setError('No se pudo crear la mascota')
+      setError('No se pudo crear la mascota');
+    } finally {
+      setLoading(false);
     }
-
-    finally {
-      setLoading(false)
-    }
-
   }
 
+  // Guardar edición
   async function onSaveEdit(id) {
-
-    setLoading(true)
-    setError('')
-
+    setLoading(true);
+    setError('');
+    setSuccess('');
     try {
-
-      const edadNum = editEdad !== '' ? Number(editEdad) : undefined
-
+      const edadNum = editEdad !== '' ? Number(editEdad) : undefined;
       const payload = {
         nombre: editNombre,
         id_especie: editIdEspecie,
         id_sexo: editIdSexo,
         raza: editRaza,
         edad: edadNum,
-        descripcion: editDescripcion
-      }
+        descripcion: editDescripcion,
+      };
+      if (editImagenFile) payload.imagen = editImagenFile;
 
-      if (editImagenFile) payload.imagen = editImagenFile
-
-      await actualizarMascota(Number(id), payload)
-
-      setEditId(null)
-
-      await load()
-
+      await actualizarMascota(Number(id), payload);
+      setEditId(null);
+      setSuccess('Mascota actualizada correctamente');
+      await load();
     } catch {
-      setError('No se pudo actualizar la mascota')
+      setError('No se pudo actualizar la mascota');
+    } finally {
+      setLoading(false);
     }
-
-    finally {
-      setLoading(false)
-    }
-
   }
 
+  // Eliminar mascota
   async function onDelete(id) {
-
-    setLoading(true)
-    setError('')
-
+    if (!window.confirm('¿Estás seguro de eliminar esta mascota?')) return;
+    setLoading(true);
+    setError('');
+    setSuccess('');
     try {
-
-      await eliminarMascota(Number(id))
-      await load()
-
+      await eliminarMascota(Number(id));
+      setSuccess('Mascota eliminada correctamente');
+      await load();
     } catch {
-      setError('No se pudo eliminar la mascota')
+      setError('No se pudo eliminar la mascota');
+    } finally {
+      setLoading(false);
     }
-
-    finally {
-      setLoading(false)
-    }
-
   }
+
+  // Resolver URL de imagen
+  function resolveImage(src) {
+    const fallback = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
+    if (!src || typeof src !== 'string') return fallback;
+    if (/^https?:\/\//i.test(src)) return src;
+    let path = src.replace(/^public\//, '');
+    if (!path.startsWith('/')) path = '/' + path;
+    const target = import.meta.env.VITE_API_TARGET || '';
+    if (target) {
+      const base = String(target).replace(/\/+$/, '');
+      return `${base}${path}`;
+    }
+    return path;
+  }
+
+  // Badge para especie (opcional)
+  const getEspecieNombre = (id) => {
+    const e = especies.find((e) => e.id_especie === id);
+    return e?.nombre || 'Desconocida';
+  };
+
+  const getSexoNombre = (id) => {
+    const s = sexos.find((s) => s.id_sexo === id);
+    return s?.nombre || 'Desconocido';
+  };
 
   return (
-    <div>
-
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <Hero full>
-        <div style={{ width: '100%', maxWidth: 900 }}>
-          <div style={{
-            background: 'rgba(17,17,17,0.75)',
-            color: '#fff',
-            borderRadius: 16,
-            padding: 24,
-            textAlign: 'center'
-          }}>
-            <h2 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>Mascotas</h2>
-            <p style={{ marginTop: 8, color: '#e5e7eb' }}>Administra mascotas en adopción</p>
+      {/* Hero Section */}
+      <Hero
+        full
+        backgroundImage="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1950&q=80"
+      >
+        <div className="flex items-center justify-center min-h-[50vh] px-4">
+          <div className="bg-white/95 backdrop-blur-sm p-8 md:p-12 rounded-3xl shadow-2xl max-w-3xl border border-white/30 text-center">
+            <span className="inline-block bg-emerald-100 text-emerald-800 px-5 py-2 rounded-full text-sm font-semibold mb-5 shadow-sm">
+              🐾 Administración
+            </span>
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Mascotas en adopción
+            </h1>
+            <p className="text-gray-700 text-lg leading-relaxed max-w-2xl mx-auto">
+              Gestiona el catálogo de mascotas disponibles para adopción.
+            </p>
           </div>
         </div>
       </Hero>
 
-      <section style={{ padding: '24px 16px' }}>
+      {/* Contenido principal */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          {/* Mensajes globales */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl max-w-6xl mx-auto">
+              <p className="text-red-600 text-sm text-center">{error}</p>
+            </div>
+          )}
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl max-w-6xl mx-auto">
+              <p className="text-green-600 text-sm text-center">{success}</p>
+            </div>
+          )}
 
-        <div style={{
-          maxWidth: 1100,
-          margin: '0 auto',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 16
-        }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-6xl mx-auto">
+            {/* Columna izquierda: formulario de creación */}
+            <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Agregar nueva mascota</h3>
+              <form onSubmit={onCreate} className="space-y-4">
+                <TextInput
+                  label="Nombre"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  required
+                />
 
-          {/* CREAR MASCOTA */}
-
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: '0 6px 18px rgba(0,0,0,0.12)'
-          }}>
-
-            <h3>Agregar mascota</h3>
-
-            <form onSubmit={onCreate}>
-
-              <TextInput
-                label="Nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-              />
-
-              {/* ESPECIE */}
-
-              <label>Especie</label>
-
-              <select
-                value={idEspecie}
-                onChange={(e) => setIdEspecie(e.target.value)}
-                style={{ padding: 10, borderRadius: 8, border: '1px solid #ccc', marginBottom: 12 }}
-              >
-
-                <option value="">Seleccione especie</option>
-
-                {especies.map((e) => (
-                  <option key={e.id_especie} value={e.id_especie}>
-                    {e.nombre}
-                  </option>
-                ))}
-
-              </select>
-
-              {/* SEXO */}
-
-              <label>Sexo</label>
-
-              <select
-                value={idSexo}
-                onChange={(e) => setIdSexo(e.target.value)}
-                style={{ padding: 10, borderRadius: 8, border: '1px solid #ccc', marginBottom: 12 }}
-              >
-
-                <option value="">Seleccione sexo</option>
-
-                {sexos.map((s) => (
-                  <option key={s.id_sexo} value={s.id_sexo}>
-                    {s.nombre}
-                  </option>
-                ))}
-
-              </select>
-
-              <TextInput label="Raza" value={raza} onChange={(e) => setRaza(e.target.value)} />
-
-              <TextInput
-                label="Edad"
-                type="number"
-                value={edad}
-                onChange={(e) => setEdad(e.target.value)}
-              />
-
-              <label>Descripción</label>
-
-              <textarea
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                rows={4}
-                style={{
-                  padding: 10,
-                  borderRadius: 8,
-                  border: '1px solid #ccc',
-                  marginBottom: 12
-                }}
-              />
-
-              <label>Imagen</label>
-
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImagenFile(e.target.files[0])}
-              />
-
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Guardando...' : 'Agregar'}
-              </Button>
-
-            </form>
-
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-
-          </div>
-
-          {/* LISTADO */}
-
-          <div style={{
-            background: '#fff',
-            borderRadius: 16,
-            padding: 18,
-            boxShadow: '0 6px 18px rgba(0,0,0,0.12)'
-          }}>
-
-            <h3>Listado</h3>
-
-            {items.map((m) => {
-
-              const id = m.id_mascota
-
-              return (
-
-                <div key={id} style={{
-                  background: '#f5f5f5',
-                  padding: 12,
-                  borderRadius: 12,
-                  marginBottom: 10
-                }}>
-
-                  <strong>{m.nombre}</strong> ({m.especie}) [{m.sexo}]
-
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-
-                    <Button onClick={() => {
-
-                      setEditId(id)
-                      setEditNombre(m.nombre || '')
-                      setEditRaza(m.raza || '')
-                      setEditEdad(m.edad || '')
-                      setEditDescripcion(m.descripcion || '')
-                      setEditIdEspecie(m.id_especie || '')
-                      setEditIdSexo(m.id_sexo || '')
-
-                    }}>
-                      Editar
-                    </Button>
-
-                    <Button onClick={() => onDelete(id)}>
-                      Eliminar
-                    </Button>
-
-                  </div>
-
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Especie</label>
+                  <select
+                    value={idEspecie}
+                    onChange={(e) => setIdEspecie(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Seleccione especie</option>
+                    {especies.map((e) => (
+                      <option key={e.id_especie} value={e.id_especie}>
+                        {e.nombre}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-              )
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                  <select
+                    value={idSexo}
+                    onChange={(e) => setIdSexo(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Seleccione sexo</option>
+                    {sexos.map((s) => (
+                      <option key={s.id_sexo} value={s.id_sexo}>
+                        {s.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            })}
+                <TextInput
+                  label="Raza"
+                  value={raza}
+                  onChange={(e) => setRaza(e.target.value)}
+                />
 
+                <TextInput
+                  label="Edad (años)"
+                  type="number"
+                  value={edad}
+                  onChange={(e) => setEdad(e.target.value)}
+                />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Imagen</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setImagenFile(e.target.files[0])}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  />
+                </div>
+
+                <div className="pt-4">
+                  <Button type="submit" disabled={loading} size="large" className="w-full">
+                    {loading ? 'Guardando...' : 'Agregar mascota'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            {/* Columna derecha: listado de mascotas */}
+            <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Mascotas registradas</h3>
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                {items.length === 0 ? (
+                  <p className="text-center text-gray-600 py-8">No hay mascotas registradas.</p>
+                ) : (
+                  items.map((m) => {
+                    const id = m.id_mascota;
+                    const isEdit = editId === id;
+
+                    return (
+                      <div
+                        key={id}
+                        className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow"
+                      >
+                        {!isEdit ? (
+                          <div className="flex flex-col sm:flex-row gap-4">
+                            {/* Miniatura de imagen */}
+                            <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0">
+                              <img
+                                src={resolveImage(m.imagen)}
+                                alt={m.nombre}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
+                                }}
+                              />
+                            </div>
+                            {/* Información */}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-gray-900">{m.nombre}</span>
+                                <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                                  {getEspecieNombre(m.id_especie)}
+                                </span>
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                  {getSexoNombre(m.id_sexo)}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                {m.raza && <span className="font-medium">Raza:</span>} {m.raza}{' '}
+                                {m.edad && <span>• {m.edad} años</span>}
+                              </p>
+                              {m.descripcion && (
+                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">{m.descripcion}</p>
+                              )}
+                            </div>
+                            {/* Botones */}
+                            <div className="flex gap-2 mt-2 sm:mt-0">
+                              <button
+                                onClick={() => {
+                                  setEditId(id);
+                                  setEditNombre(m.nombre || '');
+                                  setEditIdEspecie(m.id_especie || '');
+                                  setEditIdSexo(m.id_sexo || '');
+                                  setEditRaza(m.raza || '');
+                                  setEditEdad(m.edad || '');
+                                  setEditDescripcion(m.descripcion || '');
+                                  setEditImagenFile(null);
+                                }}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => onDelete(id)}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                Eliminar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // Formulario de edición inline
+                          <div className="space-y-4">
+                            <TextInput
+                              label="Nombre"
+                              value={editNombre}
+                              onChange={(e) => setEditNombre(e.target.value)}
+                            />
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Especie</label>
+                              <select
+                                value={editIdEspecie}
+                                onChange={(e) => setEditIdEspecie(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              >
+                                <option value="">Seleccione especie</option>
+                                {especies.map((e) => (
+                                  <option key={e.id_especie} value={e.id_especie}>
+                                    {e.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                              <select
+                                value={editIdSexo}
+                                onChange={(e) => setEditIdSexo(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              >
+                                <option value="">Seleccione sexo</option>
+                                {sexos.map((s) => (
+                                  <option key={s.id_sexo} value={s.id_sexo}>
+                                    {s.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <TextInput
+                              label="Raza"
+                              value={editRaza}
+                              onChange={(e) => setEditRaza(e.target.value)}
+                            />
+                            <TextInput
+                              label="Edad (años)"
+                              type="number"
+                              value={editEdad}
+                              onChange={(e) => setEditEdad(e.target.value)}
+                            />
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                              <textarea
+                                value={editDescripcion}
+                                onChange={(e) => setEditDescripcion(e.target.value)}
+                                rows={3}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Nueva imagen (opcional)</label>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => setEditImagenFile(e.target.files[0])}
+                                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                onClick={() => onSaveEdit(id)}
+                                disabled={loading}
+                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {loading ? 'Guardando...' : 'Guardar'}
+                              </button>
+                              <button
+                                onClick={() => setEditId(null)}
+                                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
-
         </div>
-
       </section>
-
     </div>
-  )
+  );
 }

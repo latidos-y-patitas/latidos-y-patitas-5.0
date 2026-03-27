@@ -3,9 +3,16 @@ import Header from '../Components/Header.jsx';
 import Hero from '../Components/Hero.jsx';
 import TextInput from '../Components/TextInput.jsx';
 import Button from '../Components/Button.jsx';
-import { crearCita, listarCitas, listarDisponibilidad, eliminarCita, cambiarEstadoCita, listarCitasAdmin, listarCitasActivasAdmin } from '../lib/api/citas';
+import {
+  crearCita,
+  listarCitas,
+  listarDisponibilidad,
+  eliminarCita,
+  cambiarEstadoCita,
+  listarCitasAdmin,
+  listarCitasActivasAdmin,
+} from '../lib/api/citas';
 import { getUser } from '../lib/api/http';
-import '../styles/citas.css'; 
 
 export default function Citas() {
   const [nombre, setNombre] = useState('');
@@ -22,6 +29,7 @@ export default function Citas() {
   const [allSlots, setAllSlots] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [activosList, setActivosList] = useState([]);
+
   const u = typeof window !== 'undefined' ? getUser() : null;
   const adminMode = (u?.role ?? '').toLowerCase() === 'admin';
 
@@ -88,9 +96,9 @@ export default function Citas() {
     }
     function isNow(fecha, hIni, hFin) {
       if (!fecha || !hIni) return false;
-      const [Y, M, D] = fecha.split('-').map((n) => Number(n));
-      const [h1, m1] = String(hIni).split(':').map((n) => Number(n));
-      const [h2, m2] = String(hFin || hIni).split(':').map((n) => Number(n));
+      const [Y, M, D] = fecha.split('-').map(Number);
+      const [h1, m1] = String(hIni).split(':').map(Number);
+      const [h2, m2] = String(hFin || hIni).split(':').map(Number);
       const start = new Date(Y, M - 1, D, h1, m1, 0);
       const end = new Date(Y, M - 1, D, h2, m2, 0);
       return now >= start && now <= end;
@@ -153,221 +161,300 @@ export default function Citas() {
     }
   }
 
-  // Función para obtener clase de estado
-  const getEstadoClass = (estado) => {
+  // Función para obtener clases de estado
+  const getEstadoBadge = (estado) => {
     const e = (estado || '').toLowerCase();
-    if (e === 'confirmada' || e === 'aceptada') return 'badge badge-success';
-    if (e === 'pendiente') return 'badge badge-warning';
-    if (e === 'cancelada' || e === 'rechazada') return 'badge badge-danger';
-    return 'badge badge-secondary';
+    const base = 'px-3 py-1 rounded-full text-xs font-semibold';
+    if (e === 'confirmada' || e === 'aceptada') return `${base} bg-green-100 text-green-800`;
+    if (e === 'pendiente') return `${base} bg-yellow-100 text-yellow-800`;
+    if (e === 'cancelada' || e === 'rechazada') return `${base} bg-red-100 text-red-800`;
+    return `${base} bg-gray-100 text-gray-800`;
   };
 
   return (
-    <div className="citas-page">
+    <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <Hero full>
-        <div className="hero-contenido">
-          <div className="hero-card">
-            <span className="hero-badge">🩺 Cuidado veterinario</span>
-            <h1 className="hero-titulo">
-              Agenda la cita de tu <span>mascota</span>
+      {/* Hero Section */}
+      <Hero
+        full
+        backgroundImage="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1950&q=80"
+      >
+        <div className="flex items-center justify-center min-h-[50vh] px-4">
+          <div className="bg-white/95 backdrop-blur-sm p-8 md:p-12 rounded-3xl shadow-2xl max-w-3xl border border-white/30 text-center">
+            <span className="inline-block bg-emerald-100 text-emerald-800 px-5 py-2 rounded-full text-sm font-semibold mb-5 shadow-sm">
+              🩺 Cuidado veterinario
+            </span>
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Agenda la cita de tu <span className="text-emerald-600">mascota</span>
             </h1>
-            <p className="hero-descripcion">
+            <p className="text-gray-700 text-lg leading-relaxed max-w-2xl mx-auto">
               Ofrecemos atención profesional y personalizada para el bienestar de tu compañero fiel.
             </p>
           </div>
         </div>
       </Hero>
 
+      {/* Admin Section: Citas activas ahora */}
       {adminMode && (
-        <section className="admin-section">
-          <div className="container">
-            <div className="seccion-header">
-              <span className="seccion-badge">ADMINISTRADOR</span>
-              <h2>Citas activas ahora</h2>
+        <section className="py-12 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10">
+              <span className="text-emerald-700 font-semibold text-sm uppercase tracking-wider bg-emerald-100 px-5 py-2 rounded-full">
+                ADMINISTRADOR
+              </span>
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-4">
+                Citas activas ahora
+              </h2>
             </div>
 
-            {adminLoading && <div className="loading-spinner">Cargando...</div>}
-
-            {activos.length === 0 && !adminLoading && (
-              <p className="no-data">No hay citas activas en este momento.</p>
+            {adminLoading && (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+              </div>
             )}
 
-            <div className="citas-grid">
+            {!adminLoading && activos.length === 0 && (
+              <p className="text-center text-gray-600 py-8">No hay citas activas en este momento.</p>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activos.map((c, i) => {
                 const id = c.id ?? c.id_cita ?? i;
                 return (
-                  <div key={id} className="cita-card admin-card" style={{ animationDelay: `${i * 0.1}s` }}>
-                    <div className="cita-header">
-                      <span className={getEstadoClass(c.estado)}>{c.estado || 'Pendiente'}</span>
-                    </div>
-                    <div className="cita-body">
-                      <p className="cita-motivo">{c.motivo || 'Sin motivo'}</p>
-                      {c.fecha && <p className="cita-fecha"><strong>Fecha:</strong> {c.fecha}</p>}
-                      {c.hora && <p className="cita-hora"><strong>Hora:</strong> {c.hora}</p>}
-                      {c.id_cliente && <p className="cita-cliente"><strong>Cliente ID:</strong> {c.id_cliente}</p>}
-                    </div>
-                    <div className="cita-acciones">
-                      <select
-                        defaultValue={c.estado ?? 'pendiente'}
-                        onChange={(e) => adminEstado(id, e.target.value)}
-                        className="input-field select-small"
-                        disabled={adminLoading}
-                      >
-                        <option value="pendiente">Pendiente</option>
-                        <option value="confirmada">Confirmada</option>
-                        <option value="cancelada">Cancelada</option>
-                      </select>
-                      <Button
-                        onClick={() => adminEliminar(id)}
-                        disabled={adminLoading}
-                        variant="danger"
-                        size="small"
-                      >
-                        Eliminar
-                      </Button>
+                  <div
+                    key={id}
+                    className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
+                  >
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <span className={getEstadoBadge(c.estado)}>{c.estado || 'Pendiente'}</span>
+                      </div>
+                      <p className="text-gray-800 font-medium mb-2 line-clamp-2">{c.motivo || 'Sin motivo'}</p>
+                      {c.fecha && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Fecha:</span> {c.fecha}
+                        </p>
+                      )}
+                      {c.hora && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Hora:</span> {c.hora}
+                        </p>
+                      )}
+                      {c.id_cliente && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Cliente ID:</span> {c.id_cliente}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-5">
+                        <select
+                          defaultValue={c.estado ?? 'pendiente'}
+                          onChange={(e) => adminEstado(id, e.target.value)}
+                          disabled={adminLoading}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="pendiente">Pendiente</option>
+                          <option value="confirmada">Confirmada</option>
+                          <option value="cancelada">Cancelada</option>
+                        </select>
+                        <button
+                          onClick={() => adminEliminar(id)}
+                          disabled={adminLoading}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {error && <p className="auth-feedback error">{error}</p>}
+            {error && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-red-600 text-sm text-center">{error}</p>
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      <section className="cita-principal-section">
-        <div className="container grid-2">
-          <div className="info-card">
-            <h3>Información de Citas</h3>
-            <ul className="servicios-lista">
-              <li>Consulta general</li>
-              <li>Vacunación</li>
-              <li>Desparasitación</li>
-              <li>Peluquería</li>
-              <li>Urgencias</li>
-            </ul>
-            <h4>Horario de Atención</h4>
-            <div className="horario">
-              <p><strong>Lunes a Viernes:</strong> 8:00 AM - 7:00 PM</p>
-              <p><strong>Sábados:</strong> 9:00 AM - 5:00 PM</p>
-              <p><strong>Domingos:</strong> 10:00 AM - 2:00 PM (Solo emergencias)</p>
+      {/* Sección principal: información + formulario */}
+      <section className="py-16 bg-gradient-to-b from-gray-50 to-white">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            {/* Información de servicios */}
+            <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Información de Citas</h3>
+              <div className="mb-6">
+                <h4 className="font-semibold text-gray-800 mb-3">Servicios disponibles</h4>
+                <ul className="space-y-2">
+                  {['Consulta general', 'Vacunación', 'Desparasitación', 'Peluquería', 'Urgencias'].map(
+                    (servicio) => (
+                      <li key={servicio} className="flex items-center gap-2 text-gray-700">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        {servicio}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-3">Horario de Atención</h4>
+                <div className="space-y-2 text-gray-700">
+                  <p><span className="font-medium">Lunes a Viernes:</span> 8:00 AM - 7:00 PM</p>
+                  <p><span className="font-medium">Sábados:</span> 9:00 AM - 5:00 PM</p>
+                  <p><span className="font-medium">Domingos:</span> 10:00 AM - 2:00 PM (Solo emergencias)</p>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="form-card">
-            <h3>Agenda tu cita</h3>
-            <form onSubmit={onSubmit}>
-              <TextInput
-                label="Nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                name="nombre"
-                required
-              />
-
-              <div className="input-group">
-                <label className="input-label">Tipo de mascota</label>
-                <select
-                  value={tipoMascota}
-                  onChange={(e) => setTipoMascota(e.target.value)}
-                  className="input-field"
+            {/* Formulario de cita */}
+            <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Agenda tu cita</h3>
+              <form onSubmit={onSubmit} className="space-y-4">
+                <TextInput
+                  label="Nombre"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  name="nombre"
                   required
-                >
-                  <option>Perro</option>
-                  <option>Gato</option>
-                  <option>Otro</option>
-                </select>
-              </div>
+                />
 
-              <div className="input-group">
-                <label className="input-label">Tipo de servicio</label>
-                <select
-                  value={tipoServicio}
-                  onChange={(e) => setTipoServicio(e.target.value)}
-                  className="input-field"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de mascota
+                  </label>
+                  <select
+                    value={tipoMascota}
+                    onChange={(e) => setTipoMascota(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    <option>Perro</option>
+                    <option>Gato</option>
+                    <option>Otro</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de servicio
+                  </label>
+                  <select
+                    value={tipoServicio}
+                    onChange={(e) => setTipoServicio(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    <option>Consulta general</option>
+                    <option>Vacunación</option>
+                    <option>Desparasitación</option>
+                    <option>Peluquería</option>
+                    <option>Urgencias</option>
+                  </select>
+                </div>
+
+                <TextInput
+                  label="Fecha de la cita"
+                  type="date"
+                  value={fecha}
+                  onChange={(e) => setFecha(e.target.value)}
+                  name="fecha"
                   required
-                >
-                  <option>Consulta general</option>
-                  <option>Vacunación</option>
-                  <option>Desparasitación</option>
-                  <option>Peluquería</option>
-                  <option>Urgencias</option>
-                </select>
-              </div>
+                />
 
-              <TextInput
-                label="Fecha de la cita"
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-                name="fecha"
-                required
-              />
-
-              <TextInput
-                label="Hora de la cita"
-                type="time"
-                value={hora}
-                onChange={(e) => setHora(e.target.value)}
-                name="hora"
-                required
-              />
-
-              <div className="input-group">
-                <label className="input-label">Disponibilidad</label>
-                <select
-                  value={idDisp}
-                  onChange={(e) => setIdDisp(e.target.value)}
-                  onFocus={() => slots.length === 0 && cargarDisponibilidad()}
-                  className="input-field"
+                <TextInput
+                  label="Hora de la cita"
+                  type="time"
+                  value={hora}
+                  onChange={(e) => setHora(e.target.value)}
+                  name="hora"
                   required
-                >
-                  <option value="">Selecciona un horario disponible</option>
-                  {slots.map((d) => (
-                    <option key={d.id_disponibilidad} value={d.id_disponibilidad}>
-                      {d.fecha} • {d.hora_inicio} – {d.hora_fin}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                />
 
-              <div className="form-actions">
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Guardando...' : 'Agendar Cita'}
-                </Button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Disponibilidad
+                  </label>
+                  <select
+                    value={idDisp}
+                    onChange={(e) => setIdDisp(e.target.value)}
+                    onFocus={() => slots.length === 0 && cargarDisponibilidad()}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  >
+                    <option value="">Selecciona un horario disponible</option>
+                    {slots.map((d) => (
+                      <option key={d.id_disponibilidad} value={d.id_disponibilidad}>
+                        {d.fecha} • {d.hora_inicio} – {d.hora_fin}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {error && <p className="auth-feedback error">{error}</p>}
-            {success && <p className="auth-feedback success">{success}</p>}
+                <div className="pt-4">
+                  <Button type="submit" disabled={loading} size="large" className="w-full">
+                    {loading ? 'Guardando...' : 'Agendar Cita'}
+                  </Button>
+                </div>
+              </form>
+
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-600 text-sm text-center">{error}</p>
+                </div>
+              )}
+              {success && (
+                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                  <p className="text-green-600 text-sm text-center">{success}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="mis-citas-section">
-        <div className="container">
-          <div className="seccion-header">
-            <span className="seccion-badge">TUS CITAS</span>
-            <h2>Historial de citas</h2>
+      {/* Historial de citas del usuario */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <span className="text-emerald-700 font-semibold text-sm uppercase tracking-wider bg-emerald-100 px-5 py-2 rounded-full">
+              TUS CITAS
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-4">Historial de citas</h2>
           </div>
 
           {citas.length === 0 ? (
-            <p className="no-data">No tienes citas agendadas.</p>
+            <p className="text-center text-gray-600 py-8">No tienes citas agendadas.</p>
           ) : (
-            <div className="citas-grid">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {citas.map((c, i) => (
-                <div key={c?.id ?? i} className="cita-card" style={{ animationDelay: `${i * 0.1}s` }}>
-                  <div className="cita-header">
-                    <span className={getEstadoClass(c.estado)}>{c.estado || 'Pendiente'}</span>
-                  </div>
-                  <div className="cita-body">
-                    <p className="cita-motivo">{c.motivo || 'Sin motivo'}</p>
-                    {c.fecha && <p className="cita-fecha"><strong>Fecha:</strong> {c.fecha}</p>}
-                    {c.hora && <p className="cita-hora"><strong>Hora:</strong> {c.hora}</p>}
-                    {c.id_cliente && <p className="cita-cliente"><strong>Cliente ID:</strong> {c.id_cliente}</p>}
+                <div
+                  key={c?.id ?? i}
+                  className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={getEstadoBadge(c.estado)}>{c.estado || 'Pendiente'}</span>
+                    </div>
+                    <p className="text-gray-800 font-medium mb-2 line-clamp-2">{c.motivo || 'Sin motivo'}</p>
+                    {c.fecha && (
+                      <p className="text-sm text-gray-600">
+                        <span className="font-semibold">Fecha:</span> {c.fecha}
+                      </p>
+                    )}
+                    {c.hora && (
+                      <p className="text-sm text-gray-600">
+                        <span className="font-semibold">Hora:</span> {c.hora}
+                      </p>
+                    )}
+                    {c.id_cliente && (
+                      <p className="text-sm text-gray-600">
+                        <span className="font-semibold">Cliente ID:</span> {c.id_cliente}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
