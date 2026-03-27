@@ -2,27 +2,25 @@ import { useEffect, useState } from 'react'
 import Header from '../Components/Header.jsx'
 import Hero from '../Components/Hero.jsx'
 import Button from '../Components/Button.jsx'
-import { listarMascotas } from '../lib/api/adopcion'
+import { listarMisMascotas } from '../lib/api/adopcion';
 import { getUser } from '../lib/api/http'
 
 export default function MisMascotas() {
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    listarMascotas()
-      .then((data) => {
-        const list = Array.isArray(data) ? data : []
-        const u = getUser()
-        const uid = (u?.id ?? u?.id_usuario)
-        const mine = list.filter((m) => {
-          const ownerKeys = ['id_cliente', 'id_dueno', 'id_dueño', 'cliente_id', 'usuario_id']
-          return ownerKeys.some((k) => m && m[k] === uid)
-        })
-        setItems(mine.length > 0 ? mine : list)
-      })
-      .catch(() => setError('No se pudieron cargar tus mascotas'))
-  }, [])
+
+useEffect(() => {
+  const u = getUser();
+  const uid = u?.id ?? u?.id_usuario;
+  if (!uid) {
+    setError('Debes iniciar sesión para ver tus mascotas');
+    return;
+  }
+  listarMisMascotas(uid)
+    .then((data) => setItems(Array.isArray(data) ? data : []))
+    .catch(() => setError('No se pudieron cargar tus mascotas'));
+}, []);
 
   return (
     <div>
@@ -67,7 +65,14 @@ export default function MisMascotas() {
             </article>
           ))}
         </div>
-        {error ? <p className="auth-feedback" style={{ color: 'crimson', textAlign: 'center' }}>{error}</p> : null}
+        {items.length === 0 && !error && (
+          <p style={{ textAlign: 'center', color: '#6b7280', marginTop: 40 }}>
+            Aún no has adoptado ninguna mascota.
+          </p>
+        )}
+        {error && (
+          <p style={{ textAlign: 'center', color: 'crimson', marginTop: 40 }}>{error}</p>
+        )}
       </section>
     </div>
   )

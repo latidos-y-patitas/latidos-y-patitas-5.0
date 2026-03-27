@@ -10,27 +10,17 @@ export default function AdminMensajes() {
   const [error, setError] = useState('');
 
   async function load() {
-    setError('');
-    setLoading(true);
-    try {
-      let data = [];
-      try {
-        data = await request('GET', '/mensajes-contacto', undefined, { auth: true });
-      } catch (err) {
-        try {
-          data = await request('GET', '/contact/messages', undefined, { auth: true });
-        } catch {
-          data = [];
-        }
-      }
-      setItems(Array.isArray(data) ? data : []);
-    } catch {
-      setError('No se pudieron cargar los mensajes');
-    } finally {
-      setLoading(false);
-    }
+  setError('');
+  setLoading(true);
+  try {
+    const data = await request('GET', '/admin/contacto-mensajes', undefined, { auth: true });
+    setItems(Array.isArray(data) ? data : []);
+  } catch {
+    setError('No se pudieron cargar los mensajes');
+  } finally {
+    setLoading(false);
   }
-
+}
   useEffect(() => {
     load();
   }, []);
@@ -127,6 +117,7 @@ export default function AdminMensajes() {
                 const id = m.id ?? index;
                 const nombre = m.nombre ?? m.name ?? 'Desconocido';
                 const email = m.email ?? '';
+                const asunto = m.asunto ?? m.subject ?? null;
                 const mensaje = m.mensaje ?? m.message ?? '';
                 const fecha = m.created_at ?? m.fecha ?? null;
 
@@ -154,6 +145,11 @@ export default function AdminMensajes() {
                           </span>
                         )}
                       </div>
+                      {asunto && (
+                        <span className="mt-1 inline-block text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                          Asunto: {asunto}
+                        </span>
+                      )}
                       <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
                         {mensaje}
                       </p>

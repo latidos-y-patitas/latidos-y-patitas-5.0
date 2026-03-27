@@ -3,7 +3,7 @@ import Header from '../Components/Header.jsx'
 import Hero from '../Components/Hero.jsx'
 import TextInput from '../Components/TextInput.jsx'
 import Button from '../Components/Button.jsx'
-import { listarMascotas, crearSolicitudAdopcion, adoptarMascota } from '../lib/api/adopcion'
+import { listarMascotas, adoptarMascota} from '../lib/api/adopcion'
 import { getUser } from '../lib/api/http'
 
 export default function SolicitudAdopcion() {

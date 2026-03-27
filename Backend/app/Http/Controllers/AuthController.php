@@ -55,10 +55,22 @@ class AuthController extends Controller
             'token' => $token,
         ]);
 
-        return response()->json([
-            'token' => $token,
-            'user'  => $user,
-        ]);
+        // Cargar el rol
+$user->load('rol');
+
+// Si es veterinario, incluir su id_veterinario
+$vetData = null;
+if ($user->rol && $user->rol->nombre_rol === 'veterinario') {
+    $vet = \App\Models\Veterinario::where('id_usuario', $user->id_usuario)->first();
+    $vetData = $vet ? $vet->id_veterinario : null;
+}
+
+return response()->json([
+    'token' => $token,
+    'user'  => array_merge($user->toArray(), [
+        'id_veterinario' => $vetData,
+    ]),
+]);
     }
 
     public function logout(Request $request)

@@ -2,105 +2,91 @@ import { useEffect, useState } from 'react';
 import Header from '../Components/Header.jsx';
 import Hero from '../Components/Hero.jsx';
 import {
-  listarCitas,
-  listarCitasDeCliente,
-  eliminarCita,
   listarCitasPorVeterinario,
-  listarDisponibilidad,
+  listarCitasDeCliente,
+  confirmarCita,
+  cancelarCita,
+  eliminarCita,
 } from '../lib/api/citas';
 import { getUser } from '../lib/api/http';
 
 export default function MisCitas() {
-  const [items, setItems] = useState([]);
-  const [pendingItems, setPendingItems] = useState([]);
+  const [misCitas, setMisCitas] = useState([]);
+  const [pendientes, setPendientes] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' or 'pending'
+  const [activeTab, setActiveTab] = useState('all');
 
-  useEffect(() => {
-    const u = getUser();
-    const uid = u?.id ?? u?.id_usuario ?? u?.id_veterinario;
-    const fetchPromise =
-      u?.role === 'veterinario'
-        ? listarCitasPorVeterinario(uid)
-        : listarCitasDeCliente(uid);
+  const u = getUser();
+  const isVeterinario = u?.role === 'veterinario';
+  const uid = isVeterinario
+    ? u?.id_veterinario
+    : (u?.id ?? u?.id_usuario);
 
-    fetchPromise
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        let mine;
-        if (u?.role === 'veterinario') {
-          mine = list.filter((c) => c && Number(c?.id_veterinario) === Number(uid));
-        } else {
-          mine = list.filter((c) => {
-            const cid = c?.id_cliente ?? c?.cliente_id ?? c?.id_usuario ?? c?.user_id;
-            return Number(cid) === Number(uid);
-          });
-        }
-        setItems(mine.length > 0 ? mine : list);
+  async function cargarCitas() {
+    if (!uid) {
+      setError('No se pudo identificar al usuario');
+      setInitialLoading(false);
+      return;
+    }
+    try {
+      if (isVeterinario) {
+        console.log('vet uid:', uid);
+        const [confirmadas, pend] = await Promise.all([
+          listarCitasPorVeterinario(uid, 'confirmada'),
+          listarCitasPorVeterinario(uid, 'pendiente'),
+        ]);
+        console.log('confirmadas:', confirmadas);
+        console.log('pendientes:', pend);
+        setMisCitas(Array.isArray(confirmadas) ? confirmadas : []);
+        setPendientes(Array.isArray(pend) ? pend : []);
+      } else {
+        const data = await listarCitasDeCliente(uid);
+        setMisCitas(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('error cargarCitas:', e);
+      setError('No se pudieron cargar las citas');
+    } finally {
+      setInitialLoading(false);
+    }
+  }
 
-        // For veterinarians, also load pending appointments
-        if (u?.role === 'veterinario') {
-          const pendingPromise = listarCitasPorVeterinario(uid, 'pendiente');
-          pendingPromise
-            .then((pendingData) => {
-              const pendingList = Array.isArray(pendingData) ? pendingData : [];
-              const pendingMine = pendingList.filter((c) => c && Number(c?.id_veterinario) === Number(uid));
-              setPendingItems(pendingMine.length > 0 ? pendingMine : pendingList);
-            })
-            .catch(() => {
-              // If pending endpoint fails, filter from all
-              const pendingFiltered = mine.filter((c) => (c.estado || '').toLowerCase() === 'pendiente');
-              setPendingItems(pendingFiltered);
-            });
-        }
-      })
-      .catch(() => setError('No se pudieron cargar tus citas'))
-      .finally(() => setInitialLoading(false));
-  }, []);
+  useEffect(() => { cargarCitas(); }, []);
 
-  async function onCancel(id) {
+  async function onConfirmar(citaId) {
     setLoading(true);
     setError('');
     try {
-      await eliminarCita(Number(id));
-      // refresh list
-      const u = getUser();
-      const uid = u?.id ?? u?.id_usuario ?? u?.id_veterinario;
-      const data = await (u?.role === 'veterinario'
-        ? listarCitasPorVeterinario(uid)
-        : listarCitasDeCliente(uid));
-      const list = Array.isArray(data) ? data : [];
-      let mine;
-      if (u?.role === 'veterinario') {
-        mine = list.filter((c) => c && Number(c?.id_veterinario) === Number(uid));
-      } else {
-        mine = list.filter((c) => {
-          const cid = c?.id_cliente ?? c?.cliente_id ?? c?.id_usuario ?? c?.user_id;
-          return Number(cid) === Number(uid);
-        });
-      }
-      setItems(mine.length > 0 ? mine : list);
+      await confirmarCita(uid, citaId);
+      await cargarCitas();
+    } catch {
+      setError('No se pudo confirmar la cita');
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      // Refresh pending for veterinarians
-      if (u?.role === 'veterinario') {
-        const pendingPromise = listarCitasPorVeterinario(uid, 'pendiente');
-        pendingPromise
-          .then((pendingData) => {
-            const pendingList = Array.isArray(pendingData) ? pendingData : [];
-            const pendingMine = pendingList.filter((c) => c && Number(c?.id_veterinario) === Number(uid));
-            setPendingItems(pendingMine.length > 0 ? pendingMine : pendingList);
-          })
-          .catch(() => {
-            const pendingFiltered = mine.filter((c) => (c.estado || '').toLowerCase() === 'pendiente');
-            setPendingItems(pendingFiltered);
-          });
-      }
-      // optional refresh availability
-      try {
-        await listarDisponibilidad();
-      } catch {}
+  async function onRechazar(citaId) {
+    setLoading(true);
+    setError('');
+    try {
+      await cancelarCita(uid, citaId);
+      await cargarCitas();
+    } catch {
+      setError('No se pudo rechazar la cita');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onCancelarCliente(citaId) {
+    setLoading(true);
+    setError('');
+    try {
+      await eliminarCita(citaId);
+      await cargarCitas();
     } catch {
       setError('No se pudo cancelar la cita');
     } finally {
@@ -108,24 +94,26 @@ export default function MisCitas() {
     }
   }
 
-  // Badge de estado si está disponible en el objeto
   const getEstadoBadge = (estado) => {
     const base = 'px-3 py-1 rounded-full text-xs font-semibold';
     const e = (estado || '').toLowerCase();
-    if (e === 'confirmada' || e === 'aceptada') return `${base} bg-green-100 text-green-800`;
-    if (e === 'pendiente') return `${base} bg-yellow-100 text-yellow-800`;
-    if (e === 'cancelada' || e === 'rechazada') return `${base} bg-red-100 text-red-800`;
+    if (e === 'confirmada') return `${base} bg-green-100 text-green-800`;
+    if (e === 'pendiente')  return `${base} bg-yellow-100 text-yellow-800`;
+    if (e === 'cancelada')  return `${base} bg-red-100 text-red-800`;
     return `${base} bg-gray-100 text-gray-800`;
   };
 
-  const u = getUser();
-  const isVeterinario = u?.role === 'veterinario';
+  const getFecha = (c) => c?.disponibilidad?.fecha ?? c?.fecha ?? '—';
+  const getHora  = (c) => c?.disponibilidad?.hora_inicio ?? c?.hora ?? '—';
+  const getNombreCliente = (c) =>
+    c?.cliente?.nombre ?? c?.cliente?.name ?? `Cliente #${c?.id_cliente ?? '?'}`;
+
+  const displayList = activeTab === 'pending' && isVeterinario ? pendientes : misCitas;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Hero Section */}
       <Hero
         full
         backgroundImage="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1950&q=80"
@@ -136,21 +124,23 @@ export default function MisCitas() {
               📅 Tus citas
             </span>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Mis citas
+              {isVeterinario ? 'Gestión de citas' : 'Mis citas'}
             </h1>
             <p className="text-gray-700 text-lg leading-relaxed max-w-2xl mx-auto">
-              Historial y próximas citas programadas.
+              {isVeterinario
+                ? 'Administra tus citas confirmadas y solicitudes pendientes.'
+                : 'Historial y próximas citas programadas.'}
             </p>
           </div>
         </div>
       </Hero>
 
-      {/* Contenido principal */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
+
           {isVeterinario && (
             <div className="flex justify-center mb-8">
-              <div className="bg-gray-100 p-1 rounded-lg">
+              <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
                 <button
                   onClick={() => setActiveTab('all')}
                   className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -160,6 +150,11 @@ export default function MisCitas() {
                   }`}
                 >
                   Mis citas
+                  {misCitas.length > 0 && (
+                    <span className="ml-2 bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full">
+                      {misCitas.length}
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => setActiveTab('pending')}
@@ -170,6 +165,11 @@ export default function MisCitas() {
                   }`}
                 >
                   Pendientes
+                  {pendientes.length > 0 && (
+                    <span className="ml-2 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
+                      {pendientes.length}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -177,69 +177,70 @@ export default function MisCitas() {
 
           {initialLoading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600" />
             </div>
-          ) : (activeTab === 'pending' && isVeterinario ? pendingItems : items).length === 0 ? (
+          ) : displayList.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 text-lg">
                 {activeTab === 'pending' && isVeterinario
-                  ? 'No tienes citas pendientes.'
+                  ? 'No hay citas pendientes por revisar.'
                   : 'No tienes citas agendadas.'}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-              {(activeTab === 'pending' && isVeterinario ? pendingItems : items).map((c, index) => {
-                const id = c?.id ?? c?.id_cita ?? index;
+              {displayList.map((c, index) => {
+                const id = c?.id_cita ?? c?.id ?? index;
                 return (
                   <div
                     key={id}
                     className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
                   >
                     <div className="p-6">
-                      {/* Estado si está disponible */}
                       {c.estado && (
                         <div className="mb-3">
                           <span className={getEstadoBadge(c.estado)}>{c.estado}</span>
                         </div>
                       )}
 
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         {c.motivo || 'Sin motivo especificado'}
                       </h3>
 
                       <div className="space-y-1 text-sm text-gray-600 mb-4">
-                        {c.fecha && (
-                          <p>
-                            <span className="font-medium">Fecha:</span> {c.fecha}
-                          </p>
-                        )}
-                        {c.hora && (
-                          <p>
-                            <span className="font-medium">Hora:</span> {c.hora}
-                          </p>
-                        )}
-                        {c.id_veterinario && (
-                          <p className="text-xs text-gray-500">
-                            Veterinario ID: {c.id_veterinario}
-                          </p>
+                        <p><span className="font-medium">Fecha:</span> {getFecha(c)}</p>
+                        <p><span className="font-medium">Hora:</span> {getHora(c)}</p>
+                        {isVeterinario && (
+                          <p><span className="font-medium">Cliente:</span> {getNombreCliente(c)}</p>
                         )}
                       </div>
 
-                      <button
-                        onClick={() => onCancel(id)}
-                        disabled={loading}
-                        className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                      >
-                        {loading ? (
-                          <>
-                            <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
-                            Cancelando...
-                          </>
-                        ) : (
-                          'Cancelar cita'
-                        )}
-                      </button>
+                      {isVeterinario && activeTab === 'pending' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => onConfirmar(id)}
+                            disabled={loading}
+                            className="flex-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            ✓ Aceptar
+                          </button>
+                          <button
+                            onClick={() => onRechazar(id)}
+                            disabled={loading}
+                            className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            ✗ Rechazar
+                          </button>
+                        </div>
+                      ) : !isVeterinario ? (
+                        <button
+                          onClick={() => onCancelarCliente(id)}
+                          disabled={loading}
+                          className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {loading ? 'Cancelando...' : 'Cancelar cita'}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 );

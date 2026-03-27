@@ -1,5 +1,5 @@
 import { request, setToken, clearToken, setUser, getUser } from './http'
-import type { AuthLoginPayload, AuthRegisterPayload, AuthResponse, User } from './types'
+import type { AuthLoginPayload, AuthRegisterPayload, AuthResponse, User, VeterinarioUser, AdminUser, ClienteUser } from './types'
 
 function extractToken(data: AuthResponse) {
   return data.token || data.access_token || ''
@@ -10,13 +10,31 @@ function normalizeUser(raw: any): User | null {
   const id = raw.id ?? raw.id_usuario ?? raw.user_id ?? null
   const name = raw.name ?? raw.nombre ?? ''
   const email = raw.email ?? ''
-  let role: string | undefined = raw.role ?? raw.rol ?? raw.nombre_rol
   const idRol = raw.id_rol ?? raw.rol_id ?? null
+  let role: string | undefined =
+  raw.role ??
+  (typeof raw.rol === 'string' ? raw.rol : raw.rol?.nombre_rol) ??
+  raw.nombre_rol
   if (!role && idRol != null) {
     const n = Number(idRol)
     role = n === 1 ? 'admin' : n === 2 ? 'veterinario' : 'cliente'
   }
-  return id ? { id, name, email, role } : null
+  if (!id) return null
+
+  if (role === 'veterinario') {
+    return {
+      id, name, email, role,
+      id_veterinario: raw.id_veterinario ?? raw.veterinario?.id_veterinario ?? null,
+      especialidad: raw.especialidad ?? raw.veterinario?.especialidad,
+    } as VeterinarioUser
+  }
+  if (role === 'admin') {
+    return { id, name, email, role } as AdminUser
+  }
+  return {
+    id, name, email, role: 'cliente',
+    telefono: raw.telefono,
+  } as ClienteUser
 }
 
 export async function login(payload: AuthLoginPayload): Promise<User | null> {

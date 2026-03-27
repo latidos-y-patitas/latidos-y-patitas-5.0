@@ -7,13 +7,86 @@ use App\Models\Especie;
 use App\Models\Sexo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Cloudinary\Cloudinary;
+use Cloudinary\Configuration\Configuration;
 
 class MascotaController extends Controller
 {
+    // ─── Cloudinary SDK directo ───────────────────────────────────────────────
+
+    private function getCloudinary(): Cloudinary
+    {
+        Configuration::instance([
+            'cloud' => [
+                'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                'api_key'    => env('CLOUDINARY_API_KEY'),
+                'api_secret' => env('CLOUDINARY_API_SECRET'),
+            ],
+            'url' => ['secure' => true],
+        ]);
+
+        return new Cloudinary();
+    }
+
+    private function uploadFile(\Illuminate\Http\UploadedFile $file): string
+    {
+        $result = $this->getCloudinary()->uploadApi()->upload($file->getRealPath(), [
+            'folder' => 'mascotas',
+        ]);
+
+        return $result['secure_url'];
+    }
+
+    private function uploadBase64(string $imgStr): ?string
+    {
+        if (!preg_match('/^data:image\/([a-zA-Z0-9]+);base64,/', $imgStr)) {
+            return null;
+        }
+
+        $result = $this->getCloudinary()->uploadApi()->upload($imgStr, [
+            'folder' => 'mascotas',
+        ]);
+
+        return $result['secure_url'];
+    }
+
+    private function deleteFromCloudinary(?string $url): void
+    {
+        if (!$url || !str_contains($url, 'cloudinary.com')) return;
+
+        // URL típica: https://res.cloudinary.com/cloud/image/upload/v123/mascotas/abc123.jpg
+        if (preg_match('/mascotas\/([^.\/]+)/', $url, $matches)) {
+            $this->getCloudinary()->uploadApi()->destroy('mascotas/' . $matches[1]);
+        }
+    }
+
+    private function resolveImagenData(Request $request): ?string
+    {
+        $file = $request->file('imagen')
+            ?? $request->file('image')
+            ?? $request->file('foto');
+
+        if ($file) {
+            return $this->uploadFile($file);
+        }
+
+        $imgStr = $request->input('imagen')
+            ?? $request->input('image')
+            ?? $request->input('foto');
+
+        if (is_string($imgStr) && str_starts_with($imgStr, 'data:image')) {
+            return $this->uploadBase64($imgStr);
+        }
+
+        return null;
+    }
+
+    // ─── CRUD ─────────────────────────────────────────────────────────────────
+
     public function index(Request $request)
     {
         $query = Mascota::query()->with('administrador');
+
         if ($request->filled('id_especie')) {
             $query->where('id_especie', $request->query('id_especie'));
         }
@@ -21,33 +94,30 @@ class MascotaController extends Controller
             $query->where('id_sexo', $request->query('id_sexo'));
         }
         if ($request->filled('especie')) {
-            $especie = strtolower($request->query('especie'));
-            $query->whereRaw('LOWER(especie) = ?', [$especie]);
+            $query->whereRaw('LOWER(especie) = ?', [strtolower($request->query('especie'))]);
             $query->where('estado', $request->query('estado', 'disponible'));
         } elseif ($request->query('estado')) {
             $query->where('estado', $request->query('estado'));
         }
-        $mascotas = $query->get();
-        return response()->json($mascotas);
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request)
     {
-        // basic validation so we fail earlier instead of throwing a 500 when the
-        // database rejects a missing foreign key. during initial development we
-        // don't have authentication enabled, so default to the first admin user.
         $request->validate([
             'id_admin' => 'nullable|exists:usuarios,id_usuario',
         ]);
 
-        // extract fields except imagen; file upload handled separately
         $data = $request->only([
-            'nombre','especie','id_especie','raza','edad','sexo','id_sexo','descripcion','estado','fecha_publicacion','id_admin'
+            'nombre', 'especie', 'id_especie', 'raza', 'edad',
+            'sexo', 'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
         ]);
 
-        // if the client didn't supply an admin id, fall back to a sensible value
         if (empty($data['id_admin'])) {
-            $data['id_admin'] = DB::table('usuarios')->where('id_rol', DB::table('roles')->where('nombre_rol', 'admin')->value('id_rol'))->value('id_usuario') ?? 1;
+            $data['id_admin'] = DB::table('usuarios')
+                ->where('id_rol', DB::table('roles')->where('nombre_rol', 'admin')->value('id_rol'))
+                ->value('id_usuario') ?? 1;
         }
 
         if (!$request->filled('fecha_publicacion')) {
@@ -56,57 +126,23 @@ class MascotaController extends Controller
         if (!$request->filled('estado')) {
             $data['estado'] = 'disponible';
         }
-        if (!empty($data['id_especie'])) {
-            $e = Especie::find($data['id_especie']);
-            if ($e) {
-                $data['especie'] = $e->nombre;
-            }
-        } elseif (!empty($data['especie'])) {
-            $name = trim($data['especie']);
-            if ($name !== '') {
-                $e = Especie::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first();
-                if (!$e) $e = Especie::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_especie'] = $e->id_especie;
-                $data['especie'] = $e->nombre;
-            }
+
+        $this->resolveEspecie($data);
+        $this->resolveSexo($data);
+
+        $imagenUrl = $this->resolveImagenData($request);
+        if ($imagenUrl) {
+            $data['imagen'] = $imagenUrl;
         }
-        if (!empty($data['id_sexo'])) {
-            $s = Sexo::find($data['id_sexo']);
-            if ($s) {
-                $data['sexo'] = $s->nombre;
-            }
-        } elseif (!empty($data['sexo'])) {
-            $name = trim($data['sexo']);
-            if ($name !== '') {
-                $s = Sexo::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first();
-                if (!$s) $s = Sexo::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_sexo'] = $s->id_sexo;
-                $data['sexo'] = $s->nombre;
-            }
-        }
-        $file = $request->file('imagen') ?? $request->file('image') ?? $request->file('foto');
-        if ($file) {
-            $path = $file->store('mascotas', 'public');
-            $data['imagen'] = rtrim(env('APP_URL', 'http://localhost'), '/').Storage::url($path);
-        } else {
-            $imgStr = $request->input('imagen') ?? $request->input('image') ?? $request->input('foto');
-            if (is_string($imgStr) && preg_match('/^data:image\\/([a-zA-Z0-9]+);base64,/', $imgStr, $m)) {
-            $raw = substr($imgStr, strpos($imgStr, ',') + 1);
-            $bin = base64_decode($raw);
-            $ext = strtolower($m[1]) ?: 'png';
-            $filename = 'mascotas/'.uniqid('', true).'.'.$ext;
-            Storage::disk('public')->put($filename, $bin);
-            $data['imagen'] = rtrim(env('APP_URL', 'http://localhost'), '/').Storage::url($filename);
-            }
-        }
-        $mascota = Mascota::create($data);
-        return response()->json($mascota, 201);
+
+        return response()->json(Mascota::create($data), 201);
     }
 
     public function show($id)
     {
-        $mascota = Mascota::with('administrador', 'historiaClinica')->findOrFail($id);
-        return response()->json($mascota);
+        return response()->json(
+            Mascota::with('administrador', 'historiaClinica')->findOrFail($id)
+        );
     }
 
     public function update(Request $request, $id)
@@ -118,79 +154,88 @@ class MascotaController extends Controller
         ]);
 
         $data = $request->only([
-            'nombre','especie','id_especie','raza','edad','sexo','id_sexo','descripcion','estado','fecha_publicacion','id_admin'
+            'nombre', 'especie', 'id_especie', 'raza', 'edad',
+            'sexo', 'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
         ]);
 
-        if (!empty($data['id_especie'])) {
-            $e = Especie::find($data['id_especie']);
-            if ($e) {
-                $data['especie'] = $e->nombre;
-            }
-        } elseif (!empty($data['especie'])) {
-            $name = trim($data['especie']);
-            if ($name !== '') {
-                $e = Especie::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first();
-                if (!$e) $e = Especie::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_especie'] = $e->id_especie;
-                $data['especie'] = $e->nombre;
-            }
+        $this->resolveEspecie($data);
+        $this->resolveSexo($data);
+
+        $imagenUrl = $this->resolveImagenData($request);
+        if ($imagenUrl) {
+            $this->deleteFromCloudinary($mascota->imagen);
+            $data['imagen'] = $imagenUrl;
         }
-        if (!empty($data['id_sexo'])) {
-            $s = Sexo::find($data['id_sexo']);
-            if ($s) {
-                $data['sexo'] = $s->nombre;
-            }
-        } elseif (!empty($data['sexo'])) {
-            $name = trim($data['sexo']);
-            if ($name !== '') {
-                $s = Sexo::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first();
-                if (!$s) $s = Sexo::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_sexo'] = $s->id_sexo;
-                $data['sexo'] = $s->nombre;
-            }
-        }
-        $file = $request->file('imagen') ?? $request->file('image') ?? $request->file('foto');
-        if ($file) {
-            $path = $file->store('mascotas', 'public');
-            $data['imagen'] = rtrim(env('APP_URL', 'http://localhost'), '/').Storage::url($path);
-        } else {
-            $imgStr = $request->input('imagen') ?? $request->input('image') ?? $request->input('foto');
-            if (is_string($imgStr) && preg_match('/^data:image\\/([a-zA-Z0-9]+);base64,/', $imgStr, $m)) {
-            $raw = substr($imgStr, strpos($imgStr, ',') + 1);
-            $bin = base64_decode($raw);
-            $ext = strtolower($m[1]) ?: 'png';
-            $filename = 'mascotas/'.uniqid('', true).'.'.$ext;
-            Storage::disk('public')->put($filename, $bin);
-            $data['imagen'] = rtrim(env('APP_URL', 'http://localhost'), '/').Storage::url($filename);
-            }
-        }
+
         $mascota->update($data);
+
         return response()->json($mascota);
     }
 
     public function destroy($id)
     {
-        Mascota::destroy($id);
+        $mascota = Mascota::findOrFail($id);
+        $this->deleteFromCloudinary($mascota->imagen);
+        $mascota->delete();
+
         return response()->json(['message' => 'Mascota eliminada']);
     }
 
-    public function especies(Request $request)
+    // ─── Catálogos ────────────────────────────────────────────────────────────
+
+    public function especies()
     {
-        $rows = DB::table('especies')
-            ->select('id_especie','nombre')
-            ->where('activo', 1)
-            ->orderBy('nombre')
-            ->get();
-        return response()->json($rows);
+        return response()->json(
+            DB::table('especies')
+                ->select('id_especie', 'nombre')
+                ->where('activo', 1)
+                ->orderBy('nombre')
+                ->get()
+        );
     }
-    
-    public function sexos(Request $request)
+
+    public function sexos()
     {
-        $rows = DB::table('sexos')
-            ->select('id_sexo','nombre')
-            ->where('activo', 1)
-            ->orderBy('nombre')
-            ->get();
-        return response()->json($rows);
+        return response()->json(
+            DB::table('sexos')
+                ->select('id_sexo', 'nombre')
+                ->where('activo', 1)
+                ->orderBy('nombre')
+                ->get()
+        );
+    }
+
+    // ─── Helpers privados ────────────────────────────────────────────────────
+
+    private function resolveEspecie(array &$data): void
+    {
+        if (!empty($data['id_especie'])) {
+            $e = Especie::find($data['id_especie']);
+            if ($e) $data['especie'] = $e->nombre;
+        } elseif (!empty($data['especie'])) {
+            $name = trim($data['especie']);
+            if ($name !== '') {
+                $e = Especie::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first()
+                    ?? Especie::create(['nombre' => $name, 'activo' => 1]);
+                $data['id_especie'] = $e->id_especie;
+                $data['especie']    = $e->nombre;
+            }
+        }
+    }
+
+    private function resolveSexo(array &$data): void
+    {
+        if (!empty($data['id_sexo'])) {
+            $s = Sexo::find($data['id_sexo']);
+            if ($s) $data['sexo'] = $s->nombre;
+        } elseif (!empty($data['sexo'])) {
+            $name = trim($data['sexo']);
+            if ($name !== '') {
+                $s = Sexo::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first()
+                    ?? Sexo::create(['nombre' => $name, 'activo' => 1]);
+                $data['id_sexo'] = $s->id_sexo;
+                $data['sexo']    = $s->nombre;
+            }
+        }
     }
 }

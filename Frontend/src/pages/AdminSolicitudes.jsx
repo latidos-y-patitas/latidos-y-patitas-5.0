@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Header from '../Components/Header.jsx';
 import Hero from '../Components/Hero.jsx';
 import { listarSolicitudesPendientes, cambiarEstadoSolicitud } from '../lib/api/adopcion';
+import { request } from '../lib/api/http';
 
 export default function AdminSolicitudes() {
   const [items, setItems] = useState([]);
@@ -24,21 +25,35 @@ export default function AdminSolicitudes() {
     load();
   }, []);
 
-  async function onDecide(id, estado) {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      await cambiarEstadoSolicitud(Number(id), estado);
-      setSuccess(`Solicitud ${estado === 'aceptada' ? 'aceptada' : 'rechazada'} correctamente`);
-      await load();
-      window.dispatchEvent(new Event('mascotas:updated'));
-    } catch {
-      setError('No se pudo actualizar el estado');
-    } finally {
-      setLoading(false);
+async function onDecide(id, estado) {
+  setLoading(true);
+  setError('');
+  setSuccess('');
+  try {
+    // Buscar la solicitud para obtener id_mascota
+    const solicitud = items.find(s => (s.id ?? s.id_solicitud) === id);
+    
+    await cambiarEstadoSolicitud(Number(id), estado);
+
+    // ✅ Si se aprueba, marcar la mascota como adoptada
+    if (estado === 'aceptada' && solicitud?.id_mascota) {
+      try {
+        await request('PUT', `/mascotas/${solicitud.id_mascota}`, 
+          { estado: 'adoptada' }, 
+          { auth: true }
+        );
+      } catch {}
     }
+
+    setSuccess(`Solicitud ${estado === 'aceptada' ? 'aceptada' : 'rechazada'} correctamente`);
+    await load();
+    window.dispatchEvent(new Event('mascotas:updated'));
+  } catch {
+    setError('No se pudo actualizar el estado');
+  } finally {
+    setLoading(false);
   }
+}
 
   // Badge para estado (todas están pendientes, pero por si acaso)
   const getEstadoBadge = (estado) => {
@@ -107,7 +122,7 @@ export default function AdminSolicitudes() {
             {/* Listado de solicitudes */}
             <div className="space-y-4">
               {items.map((s, index) => {
-                const id = s.id ?? index;
+                const id = s.id_solicitud ?? s.id ?? index;
                 const cliente = s.cliente || s.usuario || {};
                 const mascota = s.mascota || {};
 

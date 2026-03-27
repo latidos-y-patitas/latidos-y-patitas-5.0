@@ -11,15 +11,17 @@ import {
   cambiarEstadoCita,
   listarCitasAdmin,
   listarCitasActivasAdmin,
+  listarEspeciesMascotas,        // ✅ nuevo
+  cambiarEstadoDisponibilidad,   // ✅ nuevo
 } from '../lib/api/citas';
 import { getUser } from '../lib/api/http';
 
 export default function Citas() {
   const [nombre, setNombre] = useState('');
-  const [tipoMascota, setTipoMascota] = useState('Perro');
+  const [tipoMascota, setTipoMascota] = useState('');
+  const [especies, setEspecies] = useState([]);
   const [tipoServicio, setTipoServicio] = useState('Consulta general');
   const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('');
   const [idDisp, setIdDisp] = useState('');
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,12 @@ export default function Citas() {
   const u = typeof window !== 'undefined' ? getUser() : null;
   const adminMode = (u?.role ?? '').toLowerCase() === 'admin';
 
+  useEffect(() => {
+  listarEspeciesMascotas()
+    .then((data) => setEspecies(Array.isArray(data) ? data : []))
+    .catch(() => setEspecies(['Perro', 'Gato', 'Otro'])); // fallback
+  }, []);
+
   async function cargarCitas() {
     try {
       const data = await listarCitas();
@@ -42,14 +50,14 @@ export default function Citas() {
     }
   }
 
-  async function cargarDisponibilidad() {
-    try {
-      const data = await listarDisponibilidad('disponible');
-      setSlots(Array.isArray(data) ? data : []);
-    } catch {
-      setError('No se pudo cargar disponibilidad');
-    }
+ async function cargarDisponibilidad() {
+  try {
+    const data = await listarDisponibilidad('disponible'); // ✅ solo disponibles
+    setSlots(Array.isArray(data) ? data : []);
+  } catch {
+    setError('No se pudo cargar disponibilidad');
   }
+}
 
   async function cargarAdminData() {
     setAdminLoading(true);
@@ -139,27 +147,30 @@ export default function Citas() {
   }
 
   async function onSubmit(e) {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-    try {
-      const motivo = `Nombre: ${nombre}; Mascota: ${tipoMascota}; Servicio: ${tipoServicio}; Fecha: ${fecha}; Hora: ${hora}`;
-      await crearCita({ motivo, id_disponibilidad: idDisp ? Number(idDisp) : undefined });
-      setSuccess('Cita creada correctamente');
-      setNombre('');
-      setTipoMascota('Perro');
-      setTipoServicio('Consulta general');
-      setFecha('');
-      setHora('');
-      setIdDisp('');
-      await cargarCitas();
-    } catch (err) {
-      setError(typeof err?.message === 'string' ? err.message : 'Error al crear la cita');
-    } finally {
-      setLoading(false);
+  e.preventDefault();
+  setError('');
+  setSuccess('');
+  setLoading(true);
+  try {
+    const motivo = `Nombre: ${nombre}; Mascota: ${tipoMascota}; Servicio: ${tipoServicio}; Fecha: ${fecha}`;
+    await crearCita({ motivo, id_disponibilidad: idDisp ? Number(idDisp) : undefined });
+    // ✅ Marcar disponibilidad como ocupada
+    if (idDisp) {
+      await cambiarEstadoDisponibilidad(Number(idDisp), 'reservada');
     }
+    setSuccess('Cita creada correctamente');
+    setNombre('');
+    setTipoMascota('');
+    setTipoServicio('Consulta general');
+    setFecha('');
+    setIdDisp('');
+    await cargarDisponibilidad(); // recarga solo las disponibles
+  } catch (err) {
+    setError(typeof err?.message === 'string' ? err.message : 'Error al crear la cita');
+  } finally {
+    setLoading(false);
   }
+}
 
   // Función para obtener clases de estado
   const getEstadoBadge = (estado) => {
@@ -322,6 +333,7 @@ export default function Citas() {
                   required
                 />
 
+                {/* Tipo de mascota — dinámico */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Tipo de mascota
@@ -332,11 +344,14 @@ export default function Citas() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     required
                   >
-                    <option>Perro</option>
-                    <option>Gato</option>
-                    <option>Otro</option>
+                    <option value="">Selecciona una especie</option>
+                    {especies.map((esp) => (
+                      <option key={esp} value={esp}>{esp}</option>
+                    ))}
                   </select>
                 </div>
+
+                {/* ❌ Elimina completamente el TextInput de Hora */}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -362,15 +377,6 @@ export default function Citas() {
                   value={fecha}
                   onChange={(e) => setFecha(e.target.value)}
                   name="fecha"
-                  required
-                />
-
-                <TextInput
-                  label="Hora de la cita"
-                  type="time"
-                  value={hora}
-                  onChange={(e) => setHora(e.target.value)}
-                  name="hora"
                   required
                 />
 

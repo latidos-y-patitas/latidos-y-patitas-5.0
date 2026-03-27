@@ -4,36 +4,8 @@ import Hero from '../Components/Hero.jsx';
 import Button from '../Components/Button.jsx';
 import { listarMascotas } from '../lib/api/adopcion';
 
-// Datos de respaldo (igual que en tu código)
-const mascotas = [
-  {
-    nombre: 'MAX',
-    especie: 'Perro',
-    raza: 'Labrador',
-    edad: '2 años',
-    descripcion: 'Max es un perro muy juguetón y cariñoso. Le encanta correr y jugar con pelotas.',
-    foto: 'https://images.unsplash.com/photo-1519150268069-c094c2c0f4a0?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    nombre: 'LUNA',
-    especie: 'Gato',
-    raza: 'Siamés',
-    edad: '1 año',
-    descripcion: 'Luna es una gata muy tranquila y cariñosa. Le gusta dormir en lugares cálidos.',
-    foto: 'https://images.unsplash.com/photo-1593443320706-b57f62c3bafe?q=80&w=800&auto=format&fit=crop'
-  },
-  {
-    nombre: 'COPITO',
-    especie: 'Conejo',
-    raza: 'Enano',
-    edad: '1 año',
-    descripcion: 'Copito es un conejo muy dócil y limpio. Es ideal para familias con niños.',
-    foto: 'https://images.unsplash.com/photo-1540322530211-4775c61ab9b0?q=80&w=800&auto=format&fit=crop'
-  }
-];
-
 export default function Adopcion() {
-  const [items, setItems] = useState(mascotas);
+  const [items, setItems] = useState([]);
 
   // Función para resolver la URL de la imagen (mantenida igual)
   // IMAGEN DE PERROS INFINITODS donde sale "Const fallback"
@@ -52,31 +24,30 @@ export default function Adopcion() {
   }
 
   // Función para refrescar datos desde API
-  async function refresh() {
-    try {
-      const data = await listarMascotas();
-      if (Array.isArray(data) && data.length > 0) {
-        const available = data.filter((m) => {
-          const estado = String(m?.estado ?? '').toLowerCase();
-          if (!estado) return true;
-          return estado.includes('disponible') || estado.includes('activo');
-        });
-        const mapped = (available.length > 0 ? available : data).map((m) => {
-          const nombre = m?.nombre ?? 'Mascota';
-          const especie = m?.especie ?? m?.especieRef?.nombre ?? 'Desconocida';
-          const raza = m?.raza ?? '';
-          const edadRaw = m?.edad;
-          const edad = (typeof edadRaw === 'number' && Number.isFinite(edadRaw))
-            ? String(edadRaw)
-            : (edadRaw ?? '');
-          const descripcion = m?.descripcion ?? '';
-          const foto = resolveImage(m?.imagen ?? m?.foto);
-          return { nombre, especie, raza, edad, descripcion, foto };
-        });
-        setItems(mapped);
-      }
-    } catch {}
-  }
+async function refresh() {
+  try {
+    const data = await listarMascotas();
+    if (Array.isArray(data) && data.length > 0) {
+      // ✅ Excluir adoptadas y cualquier estado no disponible
+      const available = data.filter((m) => {
+        const estado = String(m?.estado ?? '').toLowerCase();
+        return estado === 'disponible' || estado === '';
+      });
+
+      const mapped = available.map((m) => ({
+        id: m?.id_mascota ?? m?.id,
+        nombre: m?.nombre ?? 'Mascota',
+        especie: m?.especie ?? 'Desconocida',
+        raza: m?.raza ?? '—',
+        edad: m?.edad != null ? `${m.edad} años` : '—',
+        descripcion: m?.descripcion ?? '',
+        foto: resolveImage(m?.imagen ?? m?.foto),
+      }));
+
+      setItems(mapped.length > 0 ? mapped : []);
+    }
+  } catch {}
+}
 
   useEffect(() => {
     refresh();
@@ -86,16 +57,19 @@ export default function Adopcion() {
   }, []);
 
   // Función para manejar la adopción (redirige a solicitud)
-  const handleAdoptar = (mascota) => {
-    try {
-      localStorage.setItem('selected_mascota_nombre', mascota.nombre);
-      localStorage.setItem('selected_mascota_especie', mascota.especie);
-    } catch (e) {}
-    const params = new URLSearchParams();
-    params.set('mascota', mascota.nombre || '');
-    if (mascota.especie) params.set('especie', mascota.especie);
-    window.location.hash = `solicitud-adopcion?${params.toString()}`;
-  };
+const handleAdoptar = (mascota) => {
+  try {
+    localStorage.setItem('selected_mascota_nombre', mascota.nombre);
+    localStorage.setItem('selected_mascota_especie', mascota.especie);
+    // ✅ Guardar id para la solicitud
+    if (mascota.id) localStorage.setItem('selected_mascota_id', String(mascota.id));
+  } catch {}
+  const params = new URLSearchParams();
+  params.set('mascota', mascota.nombre || '');
+  if (mascota.especie) params.set('especie', mascota.especie);
+  if (mascota.id) params.set('id_mascota', String(mascota.id));
+  window.location.hash = `solicitud-adopcion?${params.toString()}`;
+};
 
   return (
     <div className="min-h-screen bg-white">
