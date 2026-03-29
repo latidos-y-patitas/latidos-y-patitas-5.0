@@ -110,8 +110,9 @@ class MascotaController extends Controller
         ]);
 
         $data = $request->only([
-            'nombre', 'especie', 'id_especie', 'raza', 'edad',
-            'sexo', 'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
+            'nombre', 'id_especie', 'raza', 'edad',
+            'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
+            // ✅ Sin 'especie' ni 'sexo'
         ]);
 
         if (empty($data['id_admin'])) {
@@ -154,8 +155,9 @@ class MascotaController extends Controller
         ]);
 
         $data = $request->only([
-            'nombre', 'especie', 'id_especie', 'raza', 'edad',
-            'sexo', 'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
+            'nombre', 'id_especie', 'raza', 'edad',
+            'id_sexo', 'descripcion', 'estado', 'fecha_publicacion', 'id_admin',
+            // ✅ Sin 'especie' ni 'sexo'
         ]);
 
         $this->resolveEspecie($data);
@@ -208,34 +210,28 @@ class MascotaController extends Controller
     // ─── Helpers privados ────────────────────────────────────────────────────
 
     private function resolveEspecie(array &$data): void
-    {
-        if (!empty($data['id_especie'])) {
-            $e = Especie::find($data['id_especie']);
-            if ($e) $data['especie'] = $e->nombre;
-        } elseif (!empty($data['especie'])) {
-            $name = trim($data['especie']);
-            if ($name !== '') {
-                $e = Especie::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first()
-                    ?? Especie::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_especie'] = $e->id_especie;
-                $data['especie']    = $e->nombre;
-            }
+{
+    if (!empty($data['id_especie'])) {
+        $e = Especie::find($data['id_especie']);
+        if ($e) {
+            // ✅ Solo guarda id_especie, no el campo 'especie' si ya no existe
+            $data['id_especie'] = $e->id_especie;
         }
     }
+    // Elimina 'especie' del payload por si llegó desde el frontend
+    unset($data['especie']);
+}
 
     private function resolveSexo(array &$data): void
-    {
-        if (!empty($data['id_sexo'])) {
-            $s = Sexo::find($data['id_sexo']);
-            if ($s) $data['sexo'] = $s->nombre;
-        } elseif (!empty($data['sexo'])) {
-            $name = trim($data['sexo']);
-            if ($name !== '') {
-                $s = Sexo::whereRaw('LOWER(nombre)=?', [strtolower($name)])->first()
-                    ?? Sexo::create(['nombre' => $name, 'activo' => 1]);
-                $data['id_sexo'] = $s->id_sexo;
-                $data['sexo']    = $s->nombre;
-            }
+{
+    if (!empty($data['id_sexo'])) {
+        $s = Sexo::find($data['id_sexo']);
+        if ($s) {
+            // ✅ Solo guarda id_sexo, no el campo 'sexo' que ya no existe
+            $data['id_sexo'] = $s->id_sexo;
         }
     }
+    // Elimina 'sexo' del payload por si llegó desde el frontend
+    unset($data['sexo']);
+}
 }

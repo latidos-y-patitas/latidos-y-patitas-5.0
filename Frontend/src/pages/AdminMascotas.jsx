@@ -25,7 +25,7 @@ export default function AdminMascotas() {
 
   // ── Datos para selects ─────────────────────────────────────────────────────
   const [especies, setEspecies] = useState([]);
-  const [sexos, setSexos] = useState([]);
+  const [sexos, setSexos] = useState([]);   // ✅ estaba faltando
 
   // ── Estado de edición inline ───────────────────────────────────────────────
   const [editId, setEditId] = useState(null);
@@ -50,18 +50,17 @@ export default function AdminMascotas() {
   }
 
   async function loadOpciones() {
-  try {
-    // ✅ URLs relativas — pasan por el proxy de Vite
-    const [resEspecies, resSexos] = await Promise.all([
-      fetch('/api/especies'),
-      fetch('/api/sexos'),
-    ]);
-    setEspecies(await resEspecies.json());
-    setSexos(await resSexos.json());
-  } catch (err) {
-    console.error('Error cargando selects', err);
+    try {
+      const [resEspecies, resSexos] = await Promise.all([
+        fetch('/api/especies'),
+        fetch('/api/sexos'),
+      ]);
+      setEspecies(await resEspecies.json());
+      setSexos(await resSexos.json());
+    } catch (err) {
+      console.error('Error cargando selects', err);
+    }
   }
-}
 
   useEffect(() => {
     load();
@@ -89,8 +88,6 @@ export default function AdminMascotas() {
 
       await crearMascota(payload);
       setSuccess('Mascota agregada correctamente');
-
-      // Resetear formulario
       setNombre('');
       setIdEspecie('');
       setIdSexo('');
@@ -98,7 +95,6 @@ export default function AdminMascotas() {
       setEdad('');
       setDescripcion('');
       setImagenFile(null);
-
       await load();
     } catch {
       setError('No se pudo crear la mascota');
@@ -157,22 +153,20 @@ export default function AdminMascotas() {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  // Ahora imagen ya viene como URL completa de Cloudinary desde la API
   function resolveImage(src) {
     if (!src || typeof src !== 'string') return FALLBACK_IMG;
-    // URL de Cloudinary o cualquier https: se usa directa
     if (/^https?:\/\//i.test(src)) return src;
-    // Fallback para registros legacy con path local
     const path = src.replace(/^public\//, '').replace(/^\/?/, '/');
     const target = (import.meta.env.VITE_API_TARGET || '').replace(/\/+$/, '');
     return target ? `${target}${path}` : path;
   }
 
+  // Compara con Number() para manejar tanto int como string
   const getEspecieNombre = (id) =>
-    especies.find((e) => e.id_especie === id)?.nombre || 'Desconocida';
+    especies.find((e) => Number(e.id_especie) === Number(id))?.nombre || 'Desconocida';
 
   const getSexoNombre = (id) =>
-    sexos.find((s) => s.id_sexo === id)?.nombre || 'Desconocido';
+    sexos.find((s) => Number(s.id_sexo) === Number(id))?.nombre || 'Desconocido';
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -202,7 +196,6 @@ export default function AdminMascotas() {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
 
-          {/* Mensajes globales */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl max-w-6xl mx-auto">
               <p className="text-red-600 text-sm text-center">{error}</p>
@@ -326,7 +319,6 @@ export default function AdminMascotas() {
                         className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow"
                       >
                         {!isEdit ? (
-                          /* ── Vista de solo lectura ── */
                           <div className="flex flex-col sm:flex-row gap-4">
                             <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0">
                               <img
@@ -381,7 +373,6 @@ export default function AdminMascotas() {
                             </div>
                           </div>
                         ) : (
-                          /* ── Formulario de edición inline ── */
                           <div className="space-y-4">
                             <TextInput
                               label="Nombre"
