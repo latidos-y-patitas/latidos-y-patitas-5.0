@@ -1,11 +1,5 @@
 import { request, getUser } from './http';
 
-const base = import.meta.env.VITE_API_TARGET
-  ? `https://${import.meta.env.VITE_API_TARGET}`
-  : '';
-
-const apiUrl = (path: string) => `${base}${path}`;
-
 export interface Mascota {
   id_mascota?: number;
   id?: number;
@@ -77,7 +71,8 @@ function toFormData(payload: MascotaPayload): FormData {
 }
 
 export async function listarMascotas(params?: Record<string, string>): Promise<Mascota[]> {
-  const url = new URL(apiUrl('/api/mascotas'), window.location.origin);
+  const base = import.meta.env.VITE_API_BASE_URL || '/api';
+  const url = new URL(`${base}/mascotas`, window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error('Error al listar mascotas');
@@ -85,14 +80,17 @@ export async function listarMascotas(params?: Record<string, string>): Promise<M
 }
 
 export async function obtenerMascota(id: number): Promise<Mascota> {
-  const res = await fetch(apiUrl(`/api/mascotas/${id}`));
-  if (!res.ok) throw new Error('Error al obtener mascota');
-  return res.json();
+  return request<Mascota>('GET', `/mascotas/${id}`);
 }
 
 export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api';
   const form = toFormData(payload);
-  const res = await fetch(apiUrl('/api/mascotas'), { method: 'POST', body: form });
+  const res = await fetch(`${base}/mascotas`, {
+    method: 'POST',
+    body: form,
+    credentials: 'include',
+  });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error((error as any)?.message ?? 'Error al crear mascota');
@@ -101,10 +99,12 @@ export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
 }
 
 export async function actualizarMascota(id: number, payload: MascotaPayload): Promise<Mascota> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api';
   const form = toFormData(payload);
-  const res = await fetch(apiUrl(`/api/mascotas/${id}`), {
+  const res = await fetch(`${base}/mascotas/${id}`, {
     method: 'POST',
     body: form,
+    credentials: 'include',
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
@@ -114,14 +114,11 @@ export async function actualizarMascota(id: number, payload: MascotaPayload): Pr
 }
 
 export async function eliminarMascota(id: number): Promise<void> {
-  const res = await fetch(apiUrl(`/api/mascotas/${id}`), { method: 'DELETE' });
-  if (!res.ok) throw new Error('Error al eliminar mascota');
+  await request<void>('DELETE', `/mascotas/${id}`, undefined, { auth: true });
 }
 
 export async function listarMisMascotas(idUsuario: number): Promise<Mascota[]> {
-  const res = await fetch(apiUrl(`/api/usuarios/${idUsuario}/mascotas`));
-  if (!res.ok) throw new Error('Error al listar tus mascotas');
-  return res.json();
+  return request<Mascota[]>('GET', `/usuarios/${idUsuario}/mascotas`);
 }
 
 export async function listarEspecies(): Promise<Especie[]> {
@@ -200,7 +197,7 @@ export async function cambiarEstadoSolicitud(id: number, estado: string): Promis
     return await request('PATCH', `/solicitudes-adopcion/${id}/estado`, { estado: normalized }, { auth: true });
   } catch {
     if (isApprove) return request('POST', `/solicitudes-adopcion/${id}/aprobar`, undefined, { auth: true });
-    if (isReject)  return request('POST', `/solicitudes-adopcion/${id}/rechazar`, undefined, { auth: true });
+    if (isReject) return request('POST', `/solicitudes-adopcion/${id}/rechazar`, undefined, { auth: true });
     return request('PATCH', `/solicitudes-adopcion/${id}`, { estado: normalized }, { auth: true });
   }
 }
