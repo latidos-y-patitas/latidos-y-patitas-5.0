@@ -4,6 +4,7 @@ import Hero from '../Components/Hero.jsx';
 import TextInput from '../Components/TextInput.jsx';
 import Button from '../Components/Button.jsx';
 import { listarMascotas, crearMascota, actualizarMascota, eliminarMascota } from '../lib/api/adopcion';
+import { getUser } from '../lib/api/http';
 
 const FALLBACK_IMG =
   'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
@@ -14,7 +15,6 @@ export default function AdminMascotas() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // ── Formulario de creación ──────────────────────────────────────────────────
   const [nombre, setNombre] = useState('');
   const [idEspecie, setIdEspecie] = useState('');
   const [idSexo, setIdSexo] = useState('');
@@ -23,11 +23,9 @@ export default function AdminMascotas() {
   const [descripcion, setDescripcion] = useState('');
   const [imagenFile, setImagenFile] = useState(null);
 
-  // ── Datos para selects ─────────────────────────────────────────────────────
   const [especies, setEspecies] = useState([]);
-  const [sexos, setSexos] = useState([]);   // ✅ estaba faltando
+  const [sexos, setSexos] = useState([]);
 
-  // ── Estado de edición inline ───────────────────────────────────────────────
   const [editId, setEditId] = useState(null);
   const [editNombre, setEditNombre] = useState('');
   const [editIdEspecie, setEditIdEspecie] = useState('');
@@ -36,8 +34,6 @@ export default function AdminMascotas() {
   const [editEdad, setEditEdad] = useState('');
   const [editDescripcion, setEditDescripcion] = useState('');
   const [editImagenFile, setEditImagenFile] = useState(null);
-
-  // ── Carga de datos ─────────────────────────────────────────────────────────
 
   async function load() {
     setError('');
@@ -51,9 +47,10 @@ export default function AdminMascotas() {
 
   async function loadOpciones() {
     try {
+      const base = import.meta.env.VITE_API_BASE_URL || '/api';
       const [resEspecies, resSexos] = await Promise.all([
-        fetch('/api/especies'),
-        fetch('/api/sexos'),
+        fetch(`${base}/especies`),
+        fetch(`${base}/sexos`),
       ]);
       setEspecies(await resEspecies.json());
       setSexos(await resSexos.json());
@@ -67,15 +64,13 @@ export default function AdminMascotas() {
     loadOpciones();
   }, []);
 
-  // ── Crear mascota ──────────────────────────────────────────────────────────
-
   async function onCreate(e) {
     e.preventDefault();
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
+      const u = getUser();
       const payload = {
         nombre,
         id_especie: idEspecie,
@@ -83,9 +78,9 @@ export default function AdminMascotas() {
         raza,
         ...(edad !== '' && { edad: Number(edad) }),
         descripcion,
+        id_admin: u?.id ?? u?.id_usuario,
         ...(imagenFile && { imagen: imagenFile }),
       };
-
       await crearMascota(payload);
       setSuccess('Mascota agregada correctamente');
       setNombre('');
@@ -103,14 +98,12 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Guardar edición ────────────────────────────────────────────────────────
-
   async function onSaveEdit(id) {
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
+      const u = getUser();
       const payload = {
         nombre: editNombre,
         id_especie: editIdEspecie,
@@ -118,9 +111,9 @@ export default function AdminMascotas() {
         raza: editRaza,
         ...(editEdad !== '' && { edad: Number(editEdad) }),
         descripcion: editDescripcion,
+        id_admin: u?.id ?? u?.id_usuario,
         ...(editImagenFile && { imagen: editImagenFile }),
       };
-
       await actualizarMascota(Number(id), payload);
       setEditId(null);
       setSuccess('Mascota actualizada correctamente');
@@ -132,14 +125,11 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Eliminar mascota ───────────────────────────────────────────────────────
-
   async function onDelete(id) {
     if (!window.confirm('¿Estás seguro de eliminar esta mascota?')) return;
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
       await eliminarMascota(Number(id));
       setSuccess('Mascota eliminada correctamente');
@@ -151,8 +141,6 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
   function resolveImage(src) {
     if (!src || typeof src !== 'string') return FALLBACK_IMG;
     if (/^https?:\/\//i.test(src)) return src;
@@ -161,14 +149,11 @@ export default function AdminMascotas() {
     return target ? `${target}${path}` : path;
   }
 
-  // Compara con Number() para manejar tanto int como string
   const getEspecieNombre = (id) =>
     especies.find((e) => Number(e.id_especie) === Number(id))?.nombre || 'Desconocida';
 
   const getSexoNombre = (id) =>
     sexos.find((s) => Number(s.id_sexo) === Number(id))?.nombre || 'Desconocido';
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -209,7 +194,6 @@ export default function AdminMascotas() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-6xl mx-auto">
 
-            {/* ── Formulario de creación ───────────────────────────────────── */}
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Agregar nueva mascota</h3>
 
@@ -301,7 +285,6 @@ export default function AdminMascotas() {
               </form>
             </div>
 
-            {/* ── Listado de mascotas ──────────────────────────────────────── */}
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Mascotas registradas</h3>
 

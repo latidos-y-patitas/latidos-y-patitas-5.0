@@ -1,4 +1,4 @@
-import { request, getUser } from './http';
+import { request, getUser, getToken } from './http';
 
 export interface Mascota {
   id_mascota?: number;
@@ -39,6 +39,7 @@ export interface MascotaPayload {
   estado?: string;
   imagen?: File | string;
   imagenBase64?: string;
+  id_admin?: number;
   [key: string]: unknown;
 }
 
@@ -86,10 +87,12 @@ export async function obtenerMascota(id: number): Promise<Mascota> {
 export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
   const base = import.meta.env.VITE_API_BASE_URL || '/api';
   const form = toFormData(payload);
+  const token = getToken();
   const res = await fetch(`${base}/mascotas`, {
     method: 'POST',
     body: form,
     credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
@@ -101,10 +104,12 @@ export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
 export async function actualizarMascota(id: number, payload: MascotaPayload): Promise<Mascota> {
   const base = import.meta.env.VITE_API_BASE_URL || '/api';
   const form = toFormData(payload);
+  const token = getToken();
   const res = await fetch(`${base}/mascotas/${id}`, {
     method: 'POST',
     body: form,
     credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
