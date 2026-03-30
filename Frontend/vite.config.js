@@ -22,5 +22,12 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    proxy: {
+      '/api': {
+        target: `https://${API_TARGET}`,  // ← agrega https://
+        changeOrigin: true,
+        secure: true,                      // ← true porque Railway usa HTTPS
+      },
+    },
   }
 })

@@ -1,8 +1,10 @@
 import { request, getUser } from './http';
 
-const base = import.meta.env.VITE_API_TARGET || 'latidos-y-patitas-50-production.up.railway.app';
+const base = import.meta.env.VITE_API_TARGET
+  ? `https://${import.meta.env.VITE_API_TARGET}`
+  : '';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+const apiUrl = (path: string) => `${base}${path}`;
 
 export interface Mascota {
   id_mascota?: number;
@@ -57,8 +59,6 @@ export interface SolicitudAdopcionPayload {
   estado?: string;
 }
 
-// ─── Helper FormData ──────────────────────────────────────────────────────────
-
 function toFormData(payload: MascotaPayload): FormData {
   const form = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
@@ -76,10 +76,8 @@ function toFormData(payload: MascotaPayload): FormData {
   return form;
 }
 
-// ─── Mascotas ─────────────────────────────────────────────────────────────────
-
 export async function listarMascotas(params?: Record<string, string>): Promise<Mascota[]> {
-  const url = new URL(`${base}/api/mascotas`);
+  const url = new URL(apiUrl('/api/mascotas'), window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error('Error al listar mascotas');
@@ -87,14 +85,14 @@ export async function listarMascotas(params?: Record<string, string>): Promise<M
 }
 
 export async function obtenerMascota(id: number): Promise<Mascota> {
-  const res = await fetch(`${base}/api/mascotas/${id}`);
+  const res = await fetch(apiUrl(`/api/mascotas/${id}`));
   if (!res.ok) throw new Error('Error al obtener mascota');
   return res.json();
 }
 
 export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
   const form = toFormData(payload);
-  const res = await fetch(`${base}/api/mascotas`, { method: 'POST', body: form });
+  const res = await fetch(apiUrl('/api/mascotas'), { method: 'POST', body: form });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error((error as any)?.message ?? 'Error al crear mascota');
@@ -102,16 +100,12 @@ export async function crearMascota(payload: MascotaPayload): Promise<Mascota> {
   return res.json();
 }
 
-// Solo actualizarMascota usa URL relativa para pasar por el proxy
 export async function actualizarMascota(id: number, payload: MascotaPayload): Promise<Mascota> {
   const form = toFormData(payload);
-
-  // ✅ URL relativa — evita el problema de CORS/método con URL absoluta
-  const res = await fetch(`/api/mascotas/${id}`, {
+  const res = await fetch(apiUrl(`/api/mascotas/${id}`), {
     method: 'POST',
     body: form,
   });
-
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error((error as any)?.message ?? 'Error al actualizar mascota');
@@ -120,19 +114,15 @@ export async function actualizarMascota(id: number, payload: MascotaPayload): Pr
 }
 
 export async function eliminarMascota(id: number): Promise<void> {
-  const res = await fetch(`${base}/api/mascotas/${id}`, { method: 'DELETE' });
+  const res = await fetch(apiUrl(`/api/mascotas/${id}`), { method: 'DELETE' });
   if (!res.ok) throw new Error('Error al eliminar mascota');
 }
 
-// ─── Mascotas del usuario ─────────────────────────────────────────────────────
-
 export async function listarMisMascotas(idUsuario: number): Promise<Mascota[]> {
-  const res = await fetch(`${base}/api/usuarios/${idUsuario}/mascotas`);
+  const res = await fetch(apiUrl(`/api/usuarios/${idUsuario}/mascotas`));
   if (!res.ok) throw new Error('Error al listar tus mascotas');
   return res.json();
 }
-
-// ─── Catálogos ────────────────────────────────────────────────────────────────
 
 export async function listarEspecies(): Promise<Especie[]> {
   try {
@@ -144,7 +134,6 @@ export async function listarEspecies(): Promise<Especie[]> {
         : { id_especie: e?.id_especie ?? e?.id, nombre: e?.nombre ?? e?.label, activo: e?.activo }
     );
   } catch {
-    // fallback: extraer especies únicas de las mascotas
     const mascotas = await listarMascotas();
     const nombres = [...new Set(mascotas.map((m) => m.especie).filter(Boolean))];
     return nombres.map((n) => ({ id_especie: undefined as any, nombre: n! }));
@@ -165,8 +154,6 @@ export async function listarSexos(): Promise<Sexo[]> {
   }
 }
 
-// ─── Solicitudes de adopción ──────────────────────────────────────────────────
-
 export async function adoptarMascota(
   idMascota: number,
   payload: Partial<SolicitudAdopcionPayload> = {}
@@ -174,7 +161,6 @@ export async function adoptarMascota(
   try {
     return await request('POST', `/mascotas/${idMascota}/adoptar`, payload, { auth: true });
   } catch {
-    // fallback al endpoint genérico
     return crearSolicitudAdopcion({ id_mascota: idMascota, ...payload });
   }
 }

@@ -12,9 +12,9 @@ function normalizeUser(raw: any): User | null {
   const email = raw.email ?? ''
   const idRol = raw.id_rol ?? raw.rol_id ?? null
   let role: string | undefined =
-  raw.role ??
-  (typeof raw.rol === 'string' ? raw.rol : raw.rol?.nombre_rol) ??
-  raw.nombre_rol
+    raw.role ??
+    (typeof raw.rol === 'string' ? raw.rol : raw.rol?.nombre_rol) ??
+    raw.nombre_rol
   if (!role && idRol != null) {
     const n = Number(idRol)
     role = n === 1 ? 'admin' : n === 2 ? 'veterinario' : 'cliente'
@@ -57,19 +57,6 @@ export async function login(payload: AuthLoginPayload): Promise<User | null> {
     if (user) setUser(user)
     return user
   } catch (err: any) {
-    const msg = String(err?.message || '').toLowerCase()
-    if (err?.status === 404 || err?.status === 405 || msg.includes('not found')) {
-      const list = await request<any[]>('GET', '/usuarios')
-      const found = Array.isArray(list)
-        ? list.find((u) => (u.email ?? '').toLowerCase() === payload.email.toLowerCase() && (u.password ?? '') === payload.password)
-        : null
-      const user = normalizeUser(found)
-      if (user) {
-        setToken(`local:${user.id}`)
-        setUser(user)
-        return user
-      }
-    }
     throw err
   }
 }
@@ -87,22 +74,22 @@ export async function register(payload: AuthRegisterPayload): Promise<User | nul
   if (telefono) mapped.telefono = telefono
   let data: AuthResponse
   try {
-    data = await request<AuthResponse>('POST', '/usuarios', mapped)
+    data = await request<AuthResponse>('POST', '/register', {
+      name,
+      email,
+      password,
+      password_confirmation,
+      telefono,
+    })
   } catch (err: any) {
     const status = err?.status
     const msg = String(err?.message || '').toLowerCase()
     if (status === 401 || status === 403 || status === 404 || status === 405 || msg.includes('unauthorized') || msg.includes('not found')) {
-      const candidates = ['/register', '/auth/register']
+      const candidates = ['/usuarios', '/auth/register']
       let ok: AuthResponse | null = null
       for (const p of candidates) {
         try {
-          ok = await request<AuthResponse>('POST', p, {
-            name,
-            email,
-            password,
-            password_confirmation,
-            telefono,
-          })
+          ok = await request<AuthResponse>('POST', p, mapped)
           if (ok) break
         } catch {}
       }
@@ -114,11 +101,6 @@ export async function register(payload: AuthRegisterPayload): Promise<User | nul
   }
   const token = extractToken(data)
   let user = normalizeUser(data.user)
-  if (!user) {
-    const list = await request<any[]>('GET', '/usuarios')
-    const found = Array.isArray(list) ? list.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase()) : null
-    user = normalizeUser(found)
-  }
   if (!token && user) {
     setToken(`local:${user.id}`)
   } else if (token) {
@@ -132,7 +114,7 @@ export async function logout() {
   try {
     await request('POST', '/logout', undefined, { auth: true })
   } catch {
-    // ignore any network errors
+    // ignorar errores de red
   }
   clearToken()
 }
