@@ -1,6 +1,6 @@
 import { request, getUser } from './http';
 
-const base = import.meta.env.VITE_API_TARGET || 'http://localhost:8000';
+const base = import.meta.env.VITE_API_TARGET || 'latidos-y-patitas-50-production.up.railway.app';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
