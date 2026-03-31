@@ -74,13 +74,7 @@ export async function register(payload: AuthRegisterPayload): Promise<User | nul
   if (telefono) mapped.telefono = telefono
   let data: AuthResponse
   try {
-    data = await request<AuthResponse>('POST', '/register', {
-      name,
-      email,
-      password,
-      password_confirmation,
-      telefono,
-    })
+    data = await request<AuthResponse>('POST', '/register', mapped)
   } catch (err: any) {
     const status = err?.status
     const msg = String(err?.message || '').toLowerCase()
