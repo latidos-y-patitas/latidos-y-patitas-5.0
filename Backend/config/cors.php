@@ -8,12 +8,12 @@ return [
     'allowed_origins' => [
         'http://localhost:3915',
         'http://localhost:5173',
-        'https://latidosypatitas.netlify.app'
+        'https://latidos-y-patitas-5-0.vercel.app'
     ],
 
     'allowed_origins_patterns' => [
-        // Permite cualquier subdominio de netlify.app durante pruebas
-        '#^https://[a-z0-9\-]+\.netlify\.app$#',
+        // Permite cualquier subdominio de vercel.app durante pruebas
+        '#^https://[a-z0-9\-]+\.vercel\.app$#',
     ],
 
     'allowed_headers' => ['*'],
