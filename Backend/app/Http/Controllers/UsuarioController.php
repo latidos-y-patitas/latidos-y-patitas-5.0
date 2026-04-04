@@ -53,4 +53,30 @@ class UsuarioController extends Controller
         Usuario::destroy($id);
         return response()->json(['message' => 'Usuario eliminado']);
     }
+
+    public function misMascotas($id)
+{
+    $solicitudes = \App\Models\SolicitudAdopcion::with('mascota')
+        ->where('id_cliente', $id)
+        ->where('estado', 'aprobada')
+        ->get();
+
+    $result = $solicitudes->map(function ($s) {
+        $m = $s->mascota;
+        if (!$m) return null;
+        return [
+            'id_mascota'     => $m->id_mascota,
+            'nombre'         => $m->nombre,
+            'especie'        => $m->especie,
+            'raza'           => $m->raza,
+            'edad'           => $m->edad,
+            'imagen'         => $m->imagen,
+            'estado'         => $m->estado,
+            'id_solicitud'   => $s->id_solicitud,
+            'fecha_adopcion' => $s->fecha_revision,
+        ];
+    })->filter()->values();
+
+    return response()->json($result);
+}
 }

@@ -1,95 +1,133 @@
 import { useEffect, useState } from 'react'
 import Header from '../Components/Header.jsx'
 import Hero from '../Components/Hero.jsx'
-import Button from '../Components/Button.jsx'
-import { listarMisMascotas } from '../lib/api/adopcion';
+import { listarMisMascotas } from '../lib/api/adopcion'
 import { getUser } from '../lib/api/http'
+
+const base = import.meta.env.VITE_API_TARGET || ''
 
 export default function MisMascotas() {
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
+  const [descargando, setDescargando] = useState(null)
 
+  useEffect(() => {
+    const u = getUser()
+    const uid = u?.id ?? u?.id_usuario
+    if (!uid) {
+      setError('Debes iniciar sesión para ver tus mascotas')
+      return
+    }
+    listarMisMascotas(uid)
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => setError('No se pudieron cargar tus mascotas'))
+  }, [])
 
-useEffect(() => {
-  const u = getUser();
-  const uid = u?.id ?? u?.id_usuario;
-  if (!uid) {
-    setError('Debes iniciar sesión para ver tus mascotas');
-    return;
+  async function descargarCertificado(idSolicitud, nombreMascota) {
+    setDescargando(idSolicitud)
+    try {
+      const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
+      if (!res.ok) throw new Error('No disponible')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificado-${(nombreMascota ?? 'mascota').toLowerCase().replace(/\s+/g, '-')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('El certificado solo está disponible para adopciones aprobadas.')
+    } finally {
+      setDescargando(null)
+    }
   }
-  listarMisMascotas(uid)
-    .then((data) => setItems(Array.isArray(data) ? data : []))
-    .catch(() => setError('No se pudieron cargar tus mascotas'));
-}, []);
-
-async function descargarCertificado(idSolicitud, nombreMascota) {
-  try {
-    const base = import.meta.env.VITE_API_TARGET || ''
-    const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
-    if (!res.ok) throw new Error('No disponible')
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `certificado-${(nombreMascota ?? 'mascota').toLowerCase().replace(/\s+/g, '-')}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch {
-    alert('El certificado solo está disponible para adopciones aprobadas.')
-  }
-}
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
       <Header />
-      <Hero full>
-        <div style={{ width: '100%', maxWidth: 820 }}>
-          <div style={{
-            background: 'rgba(17,17,17,0.75)',
-            color: '#fff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-            textAlign: 'center'
-          }}>
-            <h2 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>Mis mascotas</h2>
-            <p style={{ marginTop: 8, color: '#e5e7eb' }}>
-              Mascotas registradas en tu perfil
-            </p>
+
+      <Hero full backgroundImage="https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1950&q=80">
+        <div className="flex items-center justify-center min-h-[50vh] px-4">
+          <div className="bg-white/95 backdrop-blur-sm p-8 md:p-12 rounded-3xl shadow-2xl max-w-3xl border border-white/30 text-center">
+            <span className="inline-block bg-emerald-100 text-emerald-800 px-5 py-2 rounded-full text-sm font-semibold mb-5 shadow-sm">
+              🐾 Mi perfil
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Mis mascotas</h2>
+            <p className="text-gray-600 text-lg">Mascotas que has adoptado</p>
           </div>
         </div>
       </Hero>
-      <section style={{ padding: '24px 16px', minHeight: '60vh' }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 16,
-          maxWidth: 1100,
-          margin: '0 auto'
-        }}>
-          {items.map((m, i) => (
-            <article key={(m && (m.id ?? m.id_mascota)) ?? i} style={{
-              background: '#f5f5f5',
-              borderRadius: 16,
-              padding: 16,
-              boxShadow: '0 6px 16px rgba(0,0,0,0.12)'
-            }}>
-              <h3 style={{ margin: '4px 0 10px', fontSize: 20 }}>{(m && m.nombre) ?? 'Mascota'}</h3>
-              <p style={{ margin: '6px 0' }}><strong>Especie:</strong> {(m && m.especie) ?? 'Desconocida'}</p>
-              <div style={{ marginTop: 12 }}>
-                <Button onClick={() => { window.location.hash = 'solicitud-adopcion' }}>Ver detalles</Button>
-              </div>
-            </article>
-          ))}
+
+      <section className="py-16 bg-white">
+        <div className="max-w-5xl mx-auto px-4">
+
+          {error && (
+            <p className="text-center text-red-500 mb-8">{error}</p>
+          )}
+
+          {items.length === 0 && !error && (
+            <div className="text-center py-20">
+              <p className="text-6xl mb-4">🐾</p>
+              <p className="text-gray-500 text-lg">Aún no has adoptado ninguna mascota.</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {items.map((m, i) => {
+              const id = m?.id_mascota ?? m?.id
+              const idSolicitud = m?.id_solicitud
+
+              return (
+                <article
+                  key={id ?? i}
+                  className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow"
+                >
+                  {/* Imagen */}
+                  {m?.imagen && (
+                    <div className="h-48 overflow-hidden bg-gray-100">
+                      <img
+                        src={m.imagen}
+                        alt={m.nombre}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="p-5">
+                    <span className="inline-block bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full mb-2">
+                      ✓ Adoptada
+                    </span>
+
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{m?.nombre ?? 'Mascota'}</h3>
+
+                    <div className="space-y-1 text-sm text-gray-600 mb-4">
+                      {m?.especie && <p><span className="font-medium">Especie:</span> {m.especie}</p>}
+                      {m?.raza    && <p><span className="font-medium">Raza:</span> {m.raza}</p>}
+                      {m?.edad    && <p><span className="font-medium">Edad:</span> {m.edad} años</p>}
+                      {m?.fecha_adopcion && (
+                        <p><span className="font-medium">Adoptada el:</span> {m.fecha_adopcion}</p>
+                      )}
+                    </div>
+
+                    {/* Botón certificado */}
+                    {idSolicitud && (
+                      <button
+                        onClick={() => descargarCertificado(idSolicitud, m?.nombre)}
+                        disabled={descargando === idSolicitud}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                      >
+                        {descargando === idSolicitud
+                          ? '⏳ Generando...'
+                          : '📄 Descargar certificado'}
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
         </div>
-        {items.length === 0 && !error && (
-          <p style={{ textAlign: 'center', color: '#6b7280', marginTop: 40 }}>
-            Aún no has adoptado ninguna mascota.
-          </p>
-        )}
-        {error && (
-          <p style={{ textAlign: 'center', color: 'crimson', marginTop: 40 }}>{error}</p>
-        )}
       </section>
     </div>
   )

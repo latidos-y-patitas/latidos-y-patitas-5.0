@@ -63,6 +63,8 @@ Route::get('admin/contacto-mensajes',              [ContactoMensajeController::c
 Route::patch('admin/contacto-mensajes/{id}/estado',[ContactoMensajeController::class, 'updateEstado']);
 Route::post('contacto',                            [ContactoMensajeController::class, 'store']);
 
+Route::get('usuarios/{id}/mascotas', [UsuarioController::class, 'misMascotas']);
+
 // Resto de recursos
 Route::apiResource('roles',              RolController::class);
 Route::apiResource('usuarios',           UsuarioController::class);
