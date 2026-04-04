@@ -23,24 +23,30 @@ export default function MisMascotas() {
       .catch(() => setError('No se pudieron cargar tus mascotas'))
   }, [])
 
-  async function descargarCertificado(idSolicitud, nombreMascota) {
-    setDescargando(idSolicitud)
-    try {
-      const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
-      if (!res.ok) throw new Error('No disponible')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `certificado-${(nombreMascota ?? 'mascota').toLowerCase().replace(/\s+/g, '-')}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
-      alert('El certificado solo está disponible para adopciones aprobadas.')
-    } finally {
-      setDescargando(null)
+async function descargarCertificado(idSolicitud, nombreMascota) {
+  setDescargando(idSolicitud)
+  try {
+    const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
+    console.log('Status:', res.status)
+    if (!res.ok) {
+      const text = await res.text()
+      console.log('Error response:', text)
+      throw new Error(`Status ${res.status}`)
     }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `certificado-${(nombreMascota ?? 'mascota').toLowerCase().replace(/\s+/g, '-')}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Error certificado:', err)
+    alert('Error: ' + err.message)
+  } finally {
+    setDescargando(null)
   }
+}
 
   return (
     <div className="min-h-screen bg-gray-50">
