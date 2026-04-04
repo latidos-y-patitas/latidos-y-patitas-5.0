@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import Header from '../Components/Header.jsx'
 import Hero from '../Components/Hero.jsx'
-import { listarMisMascotas } from '../lib/api/adopcion'
+import { listarMisMascotas, descargarCertificadoPdf } from '../lib/api/adopcion'
 import { getUser } from '../lib/api/http'
+
 
 const base = import.meta.env.VITE_API_TARGET || ''
 
@@ -26,14 +27,7 @@ export default function MisMascotas() {
 async function descargarCertificado(idSolicitud, nombreMascota) {
   setDescargando(idSolicitud)
   try {
-    const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
-    console.log('Status:', res.status)
-    if (!res.ok) {
-      const text = await res.text()
-      console.log('Error response:', text)
-      throw new Error(`Status ${res.status}`)
-    }
-    const blob = await res.blob()
+    const blob = await descargarCertificadoPdf(idSolicitud)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -42,7 +36,7 @@ async function descargarCertificado(idSolicitud, nombreMascota) {
     URL.revokeObjectURL(url)
   } catch (err) {
     console.error('Error certificado:', err)
-    alert('Error: ' + err.message)
+    alert('No se pudo descargar el certificado.')
   } finally {
     setDescargando(null)
   }

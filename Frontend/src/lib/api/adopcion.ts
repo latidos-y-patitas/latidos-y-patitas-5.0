@@ -206,3 +206,16 @@ export async function cambiarEstadoSolicitud(id: number, estado: string): Promis
     return request('PATCH', `/solicitudes-adopcion/${id}`, { estado: normalized }, { auth: true });
   }
 }
+
+export async function descargarCertificadoPdf(idSolicitud: number): Promise<Blob> {
+  const base = import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.VITE_API_TARGET
+      ? `${String(import.meta.env.VITE_API_TARGET).replace(/\/+$/, '').replace(/\/:splat\/?$/, '')}/api`
+      : '/api')
+
+  const res = await fetch(`${base}/solicitudes-adopcion/${idSolicitud}/certificado`, {
+    headers: { Accept: 'application/pdf' },
+  })
+  if (!res.ok) throw new Error(`Status ${res.status}`)
+  return res.blob()
+}
