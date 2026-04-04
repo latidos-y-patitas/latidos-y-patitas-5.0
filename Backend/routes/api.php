@@ -31,6 +31,7 @@ Route::post('mascotas/{id}/adoptar', [SolicitudAdopcionController::class, 'adopt
 Route::post('mascotas/{id}',         [MascotaController::class, 'update']);   // 👈 POST spoofing para update con archivos
 Route::apiResource('mascotas', MascotaController::class)->except(['update']); // 👈 excluye PUT/PATCH nativos
 
+Route::get('solicitudes-adopcion/{id}/certificado', [SolicitudAdopcionController::class, 'certificado']);
 // Solicitudes de adopción
 Route::post('solicitudes-adopcion/{id}/aprobar',  [SolicitudAdopcionController::class, 'aprobar']);
 Route::post('solicitudes-adopcion/{id}/rechazar', [SolicitudAdopcionController::class, 'rechazar']);

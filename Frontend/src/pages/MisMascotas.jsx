@@ -22,6 +22,23 @@ useEffect(() => {
     .catch(() => setError('No se pudieron cargar tus mascotas'));
 }, []);
 
+async function descargarCertificado(idSolicitud, nombreMascota) {
+  try {
+    const base = import.meta.env.VITE_API_TARGET || ''
+    const res = await fetch(`${base}/api/solicitudes-adopcion/${idSolicitud}/certificado`)
+    if (!res.ok) throw new Error('No disponible')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `certificado-${(nombreMascota ?? 'mascota').toLowerCase().replace(/\s+/g, '-')}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    alert('El certificado solo está disponible para adopciones aprobadas.')
+  }
+}
+
   return (
     <div>
       <Header />

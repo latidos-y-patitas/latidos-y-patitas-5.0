@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SolicitudAdopcion;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class SolicitudAdopcionController extends Controller
 {
@@ -137,4 +138,32 @@ class SolicitudAdopcionController extends Controller
         }
         return response()->json($solicitud);
     }
+
+    public function certificado($id)
+{
+    $solicitud = SolicitudAdopcion::with('cliente', 'mascota')->findOrFail($id);
+
+    // Solo se puede descargar si está aprobada
+    if ($solicitud->estado !== 'aprobada') {
+        return response()->json(['message' => 'La solicitud no ha sido aprobada'], 403);
+    }
+
+    $mascota  = $solicitud->mascota;
+    $cliente  = $solicitud->cliente;
+    $fecha    = $solicitud->fecha_revision
+        ? \Carbon\Carbon::parse($solicitud->fecha_revision)->locale('es')->isoFormat('D [de] MMMM [de] YYYY')
+        : now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY');
+    $emision  = now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY');
+
+    $html = view('certificado-adopcion', compact(
+        'solicitud', 'mascota', 'cliente', 'fecha', 'emision'
+    ))->render();
+
+    $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)
+        ->setPaper('a4', 'portrait');
+
+    $nombreArchivo = 'certificado-' . \Str::slug($mascota->nombre ?? 'mascota') . '.pdf';
+
+    return $pdf->download($nombreArchivo);
+}
 }
