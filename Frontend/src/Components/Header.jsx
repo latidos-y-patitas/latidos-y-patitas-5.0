@@ -34,7 +34,6 @@ export default function Header() {
         <>
           <a href="#vet-disponibilidad" className="block lg:inline-block px-3 py-2 text-gray-300 hover:text-white transition-colors">Disponibilidad</a>
           <a href="#mis-citas" className="block lg:inline-block px-3 py-2 text-gray-300 hover:text-white transition-colors">Mis citas</a>
-          <a href="#vet-solicitudes" className="block lg:inline-block px-3 py-2 text-gray-300 hover:text-white transition-colors">Pendientes</a>
         </>
       );
     } else {

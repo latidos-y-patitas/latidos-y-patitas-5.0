@@ -12,7 +12,24 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+function normalizeApiTarget(target: unknown) {
+  const raw = String(target || '').trim()
+  if (!raw) return ''
+  let url = raw.replace(/\/:splat\/?$/, '').replace(/\/+$/, '')
+  if (!url) return ''
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`
+  }
+  if (/^https?:\/\/[^/]+$/i.test(url)) {
+    url = `${url}/api`
+  }
+  return url
+}
+
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  normalizeApiTarget(import.meta.env.VITE_API_TARGET) ||
+  '/api'
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
 

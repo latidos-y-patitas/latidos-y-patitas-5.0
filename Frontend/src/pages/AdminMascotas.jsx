@@ -4,6 +4,7 @@ import Hero from '../Components/Hero.jsx';
 import TextInput from '../Components/TextInput.jsx';
 import Button from '../Components/Button.jsx';
 import { listarMascotas, crearMascota, actualizarMascota, eliminarMascota } from '../lib/api/adopcion';
+import { getUser } from '../lib/api/http';
 
 const FALLBACK_IMG =
   'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=800&auto=format&fit=crop';
@@ -14,7 +15,6 @@ export default function AdminMascotas() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // ── Formulario de creación ──────────────────────────────────────────────────
   const [nombre, setNombre] = useState('');
   const [idEspecie, setIdEspecie] = useState('');
   const [idSexo, setIdSexo] = useState('');
@@ -23,11 +23,9 @@ export default function AdminMascotas() {
   const [descripcion, setDescripcion] = useState('');
   const [imagenFile, setImagenFile] = useState(null);
 
-  // ── Datos para selects ─────────────────────────────────────────────────────
   const [especies, setEspecies] = useState([]);
   const [sexos, setSexos] = useState([]);
 
-  // ── Estado de edición inline ───────────────────────────────────────────────
   const [editId, setEditId] = useState(null);
   const [editNombre, setEditNombre] = useState('');
   const [editIdEspecie, setEditIdEspecie] = useState('');
@@ -36,8 +34,6 @@ export default function AdminMascotas() {
   const [editEdad, setEditEdad] = useState('');
   const [editDescripcion, setEditDescripcion] = useState('');
   const [editImagenFile, setEditImagenFile] = useState(null);
-
-  // ── Carga de datos ─────────────────────────────────────────────────────────
 
   async function load() {
     setError('');
@@ -50,33 +46,31 @@ export default function AdminMascotas() {
   }
 
   async function loadOpciones() {
-  try {
-    // ✅ URLs relativas — pasan por el proxy de Vite
-    const [resEspecies, resSexos] = await Promise.all([
-      fetch('/api/especies'),
-      fetch('/api/sexos'),
-    ]);
-    setEspecies(await resEspecies.json());
-    setSexos(await resSexos.json());
-  } catch (err) {
-    console.error('Error cargando selects', err);
+    try {
+      const base = import.meta.env.VITE_API_BASE_URL || '/api';
+      const [resEspecies, resSexos] = await Promise.all([
+        fetch(`${base}/especies`),
+        fetch(`${base}/sexos`),
+      ]);
+      setEspecies(await resEspecies.json());
+      setSexos(await resSexos.json());
+    } catch (err) {
+      console.error('Error cargando selects', err);
+    }
   }
-}
 
   useEffect(() => {
     load();
     loadOpciones();
   }, []);
 
-  // ── Crear mascota ──────────────────────────────────────────────────────────
-
   async function onCreate(e) {
     e.preventDefault();
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
+      const u = getUser();
       const payload = {
         nombre,
         id_especie: idEspecie,
@@ -84,13 +78,11 @@ export default function AdminMascotas() {
         raza,
         ...(edad !== '' && { edad: Number(edad) }),
         descripcion,
+        id_admin: u?.id ?? u?.id_usuario,
         ...(imagenFile && { imagen: imagenFile }),
       };
-
       await crearMascota(payload);
       setSuccess('Mascota agregada correctamente');
-
-      // Resetear formulario
       setNombre('');
       setIdEspecie('');
       setIdSexo('');
@@ -98,7 +90,6 @@ export default function AdminMascotas() {
       setEdad('');
       setDescripcion('');
       setImagenFile(null);
-
       await load();
     } catch {
       setError('No se pudo crear la mascota');
@@ -107,14 +98,12 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Guardar edición ────────────────────────────────────────────────────────
-
   async function onSaveEdit(id) {
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
+      const u = getUser();
       const payload = {
         nombre: editNombre,
         id_especie: editIdEspecie,
@@ -122,9 +111,9 @@ export default function AdminMascotas() {
         raza: editRaza,
         ...(editEdad !== '' && { edad: Number(editEdad) }),
         descripcion: editDescripcion,
+        id_admin: u?.id ?? u?.id_usuario,
         ...(editImagenFile && { imagen: editImagenFile }),
       };
-
       await actualizarMascota(Number(id), payload);
       setEditId(null);
       setSuccess('Mascota actualizada correctamente');
@@ -136,14 +125,11 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Eliminar mascota ───────────────────────────────────────────────────────
-
   async function onDelete(id) {
     if (!window.confirm('¿Estás seguro de eliminar esta mascota?')) return;
     setLoading(true);
     setError('');
     setSuccess('');
-
     try {
       await eliminarMascota(Number(id));
       setSuccess('Mascota eliminada correctamente');
@@ -155,26 +141,19 @@ export default function AdminMascotas() {
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  // Ahora imagen ya viene como URL completa de Cloudinary desde la API
   function resolveImage(src) {
     if (!src || typeof src !== 'string') return FALLBACK_IMG;
-    // URL de Cloudinary o cualquier https: se usa directa
     if (/^https?:\/\//i.test(src)) return src;
-    // Fallback para registros legacy con path local
     const path = src.replace(/^public\//, '').replace(/^\/?/, '/');
     const target = (import.meta.env.VITE_API_TARGET || '').replace(/\/+$/, '');
     return target ? `${target}${path}` : path;
   }
 
   const getEspecieNombre = (id) =>
-    especies.find((e) => e.id_especie === id)?.nombre || 'Desconocida';
+    especies.find((e) => Number(e.id_especie) === Number(id))?.nombre || 'Desconocida';
 
   const getSexoNombre = (id) =>
-    sexos.find((s) => s.id_sexo === id)?.nombre || 'Desconocido';
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+    sexos.find((s) => Number(s.id_sexo) === Number(id))?.nombre || 'Desconocido';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -202,7 +181,6 @@ export default function AdminMascotas() {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
 
-          {/* Mensajes globales */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl max-w-6xl mx-auto">
               <p className="text-red-600 text-sm text-center">{error}</p>
@@ -216,7 +194,6 @@ export default function AdminMascotas() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-6xl mx-auto">
 
-            {/* ── Formulario de creación ───────────────────────────────────── */}
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Agregar nueva mascota</h3>
 
@@ -308,7 +285,6 @@ export default function AdminMascotas() {
               </form>
             </div>
 
-            {/* ── Listado de mascotas ──────────────────────────────────────── */}
             <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Mascotas registradas</h3>
 
@@ -326,7 +302,6 @@ export default function AdminMascotas() {
                         className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:shadow-md transition-shadow"
                       >
                         {!isEdit ? (
-                          /* ── Vista de solo lectura ── */
                           <div className="flex flex-col sm:flex-row gap-4">
                             <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-200 flex-shrink-0">
                               <img
@@ -381,7 +356,6 @@ export default function AdminMascotas() {
                             </div>
                           </div>
                         ) : (
-                          /* ── Formulario de edición inline ── */
                           <div className="space-y-4">
                             <TextInput
                               label="Nombre"
